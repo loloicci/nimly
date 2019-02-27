@@ -16,9 +16,13 @@ type
     bcat
   Pos2PosSet = TableRef[Pos, set[Pos]]
 
+variant LChar:
+  End
+  Real(c: char)
+
 variant Lit:
-  Nil
-  Char(pos: Pos, c: char)
+  Empty
+  Char(pos: Pos, c: LChar)
 
 variant ReSynTree:
   Term(lit: Lit)
@@ -31,7 +35,7 @@ proc collectPos(t: ReSynTree): set[Pos] =
   match t:
     Term(lit: l):
       match l:
-        Nil:
+        Empty:
           return {}
         Char(pos: p, c: _):
           return {p}
@@ -48,7 +52,7 @@ proc nullable(t: ReSynTree): bool =
   match t:
     Term(lit: l):
       match l:
-        Nil:
+        Empty:
           return true
         Char:
           return false
@@ -65,7 +69,7 @@ proc firstpos(t: ReSynTree): set[Pos] =
   match t:
     Term(lit: l):
       match l:
-        Nil:
+        Empty:
           return {}
         Char(pos: p, c: _):
           return {p}
@@ -85,7 +89,7 @@ proc lastpos(t: ReSynTree): set[Pos] =
   match t:
     Term(lit: l):
       match l:
-        Nil:
+        Empty:
           return {}
         Char(pos: p, c: _):
           return {p}
@@ -123,5 +127,3 @@ proc makeFollowposTable(t: ReSynTree): Pos2PosSet =
       for i in t.lastpos:
         result[i] = t.firstpos
       result.mergeSetTable(c[].makeFollowposTable)
-
-

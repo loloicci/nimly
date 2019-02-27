@@ -9,13 +9,14 @@ test "makeFollowposTable (Dragonbook 3.9.4)":
                        ~Bin(bcat,
                             ~Bin(bcat,
                                  ~Star(~Bin(bor,
-                                            ~Term(Char(1, 'a')),
-                                            ~Term(Char(2, 'b')))
+                                            ~Term(Char(1, Real('a'))),
+                                            ~Term(Char(2, Real('b'))))
                                  ),
-                                 ~Term(Char(3, 'a'))),
-                            ~Term(Char(4, 'b'))),
-                       ~Term(Char(5, 'b'))),
-                  ~Term(Char(6, '#')))
+                                 ~Term(Char(3, Real('a')))),
+                            ~Term(Char(4, Real('b')))),
+                       ~Term(Char(5, Real('b')))),
+                  ~Term(Char(6, End())))
+
     followpos: array[0..4, (Pos, set[Pos])] = {
       Pos(1): {Pos(1), Pos(2), Pos(3)},
       Pos(2): {Pos(1), Pos(2), Pos(3)},
