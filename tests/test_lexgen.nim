@@ -2,19 +2,32 @@ import unittest
 
 include nimly/lexgen
 
-let dbookExample = Bin(bcat,
-                       ~Bin(bcat,
-                            ~Bin(bcat,
-                                 ~Bin(bcat,
-                                      ~Star(~Bin(bor,
-                                                 ~Term(Char(1, Real('a'))),
-                                                 ~Term(Char(2, Real('b'))))
-                                      ),
-                                      ~Term(Char(3, Real('a')))),
-                                 ~Term(Char(4, Real('b')))),
-                            ~Term(Char(5, Real('b')))),
-                       ~Term(Char(6, End())))
+let
+  dbookExample = Bin(bcat,
+                     ~Bin(bcat,
+                          ~Bin(bcat,
+                               ~Bin(bcat,
+                                    ~Star(~Bin(bor,
+                                               ~Term(Char(1, Real('a'))),
+                                               ~Term(Char(2, Real('b'))))
+                                    ),
+                                    ~Term(Char(3, Real('a')))),
+                               ~Term(Char(4, Real('b')))),
+                          ~Term(Char(5, Real('b')))),
+                     ~Term(Char(6, End())))
 
+  dbookExmDFA3p36 = DFA(
+    start: DState(0),
+    accepts: {DState(4)},
+    states: {DState(0), DState(1), DState(2), DState(3), DSTate(4)},
+    tran: {
+      DState(0): {'a': DState(1), 'b': DState(2)}.newTable(),
+      DState(1): {'a': DState(1), 'b': DState(3)}.newTable(),
+      DState(2): {'a': DState(1), 'b': DState(2)}.newTable(),
+      DState(3): {'a': DState(1), 'b': DState(4)}.newTable(),
+      DState(4): {'a': DState(1), 'b': DState(2)}.newTable(),
+      }.newTable()
+    )
 
 test "test makeFollowposTable (Dragonbook 3.9.4)":
   let
@@ -31,15 +44,19 @@ test "test makeFollowposTable (Dragonbook 3.9.4)":
 test "test correctChar":
   check dbookExample.collectChar == {'a', 'b'}
 
-test "test makeDFA (Dragonbook 3.9.5)":
-  let dfa = dbookExample.makeDFA
+template checkDFA(dfa: DFA) =
+  let sa = dfa.tran[dfa.start]['a']
+  let sab = dfa.tran[sa]['b']
+  let acc = dfa.tran[sab]['b']
   check dfa.states.card == 4
   check dfa.tran[dfa.start]['b'] == dfa.start
-  let sa = dfa.tran[dfa.start]['a']
   check dfa.tran[sa]['a'] == sa
-  let sab = dfa.tran[sa]['b']
   check dfa.tran[sab]['a'] == sa
-  let acc = dfa.tran[sab]['b']
   check dfa.accepts == {acc}
   check dfa.tran[acc]['a'] == sa
   check dfa.tran[acc]['b'] == dfa.start
+
+
+test "test makeDFA (Dragonbook 3.9.5)":
+  let dfa = dbookExample.makeDFA
+  checkDFA(dfa)
