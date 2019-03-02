@@ -3,20 +3,20 @@ import unittest
 include nimly/lexgen
 
 let
-  dbookExample = Bin(bcat,
-                     ~Bin(bcat,
-                          ~Bin(bcat,
-                               ~Bin(bcat,
-                                    ~Star(~Bin(bor,
-                                               ~Term(Char(1, Real('a'))),
-                                               ~Term(Char(2, Real('b'))))
-                                    ),
-                                    ~Term(Char(3, Real('a')))),
-                               ~Term(Char(4, Real('b')))),
-                          ~Term(Char(5, Real('b')))),
-                     ~Term(Char(6, End())))
+  dbookExampleSynT = Bin(bcat,
+                         ~Bin(bcat,
+                              ~Bin(bcat,
+                                   ~Bin(bcat,
+                                        ~Star(~Bin(bor,
+                                                   ~Term(Char(1, Real('a'))),
+                                                   ~Term(Char(2, Real('b'))))
+                                        ),
+                                        ~Term(Char(3, Real('a')))),
+                                   ~Term(Char(4, Real('b')))),
+                              ~Term(Char(5, Real('b')))),
+                         ~Term(Char(6, End())))
 
-  dbookExmDFA3p36 = DFA(
+  dbookExampleDFA3p36 = DFA(
     start: DState(0),
     accepts: {DState(4)},
     states: {DState(0), DState(1), DState(2), DState(3), DSTate(4)},
@@ -39,10 +39,10 @@ test "test makeFollowposTable (Dragonbook 3.9.4)":
       Pos(5): {Pos(6)}
                 }
 
-  check dbookExample.makeFollowposTable == followpos.newTable
+  check dbookExampleSynT.makeFollowposTable == followpos.newTable
 
 test "test correctChar":
-  check dbookExample.collectChar == {'a', 'b'}
+  check dbookExampleSynT.collectChar == {'a', 'b'}
 
 template checkDFA(dfa: DFA) =
   let sa = dfa.tran[dfa.start]['a']
@@ -58,5 +58,13 @@ template checkDFA(dfa: DFA) =
 
 
 test "test makeDFA (Dragonbook 3.9.5)":
-  let dfa = dbookExample.makeDFA
+  let dfa = dbookExampleSynT.makeDFA
+  checkDFA(dfa)
+
+test "test minimizeStates (id)":
+  let dfa = dbookExampleSynT.makeDFA.minimizeStates
+  checkDFA(dfa)
+
+test "test minimizeStates":
+  let dfa = dbookExampleDFA3p36.minimizeStates
   checkDFA(dfa)

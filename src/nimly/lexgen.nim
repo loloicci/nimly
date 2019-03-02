@@ -40,6 +40,15 @@ variant ReSynTree:
   Bin(op: BOp, left: ref ReSynTree, right: ref ReSynTree)
   Star(child: ref ReSynTree)
 
+proc newPos2PosSet(): Pos2PosSet =
+  result = newTable[Pos, set[Pos]]()
+
+proc newDTran(): DTran =
+  result = newTable[DState, DTranRow]()
+
+proc newDTranRow(): DTranRow =
+  result = newTable[char, DState]()
+
 proc collectPos(t: ReSynTree): set[Pos] =
   # error on tree with not unique positions when debug
   match t:
@@ -138,7 +147,7 @@ proc mergeSetTable[A; B](a: var TableRef[A, set[B]], b: TableRef[A, set[B]]) =
 
 proc makeFollowposTable(t: ReSynTree): Pos2PosSet =
   # init
-  result = newTable[Pos, set[Pos]]()
+  result = newPos2PosSet()
 
   # make
   match t:
@@ -220,7 +229,7 @@ proc makeDFA(t: ReSynTree): DFA =
     followpos = t.makeFollowposTable
 
   var
-    tran = newTable[DState, DTranRow]()
+    tran = newDTran()
     states: set[DState] = {}
     posS2DState = newTable[set[Pos], DSTate]()
     unmarked: seq[set[Pos]] = @[]
@@ -240,7 +249,7 @@ proc makeDFA(t: ReSynTree): DFA =
     let
       ps = unmarked.pop
       s = posS2DState[ps]
-    tran[s] = newTable[char, DState]()
+    tran[s] = newDTranRow()
     for c in chars:
       let posSet = ps * charPosset[c]
       var newSPos: set[Pos] = {}
@@ -265,3 +274,62 @@ proc makeDFA(t: ReSynTree): DFA =
 
   # make DFA
   return DFA(start: iState, accepts: accepts, states: states, tran: tran)
+
+#[
+iterator pairElm[A](s: set[A]): (A, A) =
+  var tmp = s
+  for e1 in s:
+    tmp.excl(e2)
+    for e2 in tmp:
+      yield (e1, e2)
+]#
+
+proc statePartTran(state: DState, parts: seq[set[DState]],
+                   dfa: DFA): TableRef[char, DState] =
+  result = newTable[char, DState]()
+  for c, s in dfa.tran[state]:
+    for i, p in parts:
+      if s in p:
+        result[c] = DState(i)
+        break
+
+proc grind(parts: seq[set[DState]], dfa: DFA): seq[set[DState]] =
+  result = @[]
+  for setOfStates in parts:
+    var subparts: seq[(set[DState], TableRef[char, DState])] = @[]
+    for state in setOfStates:
+      let sTran = state.statePartTran(parts, dfa)
+      var isNewPart = true
+      for i, sp in subparts:
+        let (sos, tran) = sp
+        if sTran == tran:
+          subparts[i] = (sos + {state}, tran)
+          isNewPart = false
+          break
+      if isNewPart:
+        subparts.add(({state}, sTran))
+
+    # add seq of state set to result
+    for sp in subparts:
+      result.add(sp[0])
+
+
+proc minimizeStates(input: DFA): DFA =
+  var partition: seq[set[DState]] = @[]
+  var newPartition: seq[set[DState]] = @[input.states - input.accepts,
+                                         input.accepts]
+  while partition != newPartition:
+    partition = newPartition
+    newPartition = partition.grind(input)
+
+  result = DFA(tran: newDTran())
+  for i, p in partition:
+    if input.start in p:
+      result.start = DState(i)
+    for acc in input.accepts:
+      if acc in p:
+        result.accepts.incl(DState(i))
+    result.states.incl(DState(i))
+    for s in p:
+      result.tran[DState(i)] = s.statePartTran(partition, input)
+      break
