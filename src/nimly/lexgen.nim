@@ -1,30 +1,32 @@
 import tables
+import sets
 import patty
 
-import lextypes
+include lextypes
 
 
-proc `~`[A](a: A): ref A =
+proc `~`[T](obj: T): ref T =
   new(result)
-  result[] = a
+  result[] = obj
 
 
 type
   # for SynTree
-  Pos = int16
+  Pos = int
   BOp = enum
     bor,
     bcat
-  Pos2PosSet = TableRef[Pos, set[Pos]]
+  Pos2PosSet = TableRef[Pos, HashSet[Pos]]
 
   # for DFA
-  DState = int16
+  DState = int
   DTranRow = TableRef[char, DState]
   DTran = TableRef[DState, DTranRow]
-  DFA = object
+  DAccepts[T] = TableRef[DState, proc(s: string): T {.nimcall.}]
+  DFA[T] = object
     start: DState
-    accepts: set[DState]
-    states: set[DState]
+    accepts: DAccepts[T]
+    stateNum: int
     tran: DTran
 
 variant LChar:
@@ -40,8 +42,17 @@ variant ReSynTree:
   Bin(op: BOp, left: ref ReSynTree, right: ref ReSynTree)
   Star(child: ref ReSynTree)
 
+type
+  AccPosProc[T] = TableRef[Pos, proc(s: string): T {.nimcall.}]
+  LexRe[T] = object
+    st: ReSynTree
+    accPosProc: AccPosProc[T]
+
 proc newPos2PosSet(): Pos2PosSet =
-  result = newTable[Pos, set[Pos]]()
+  result = newTable[Pos, HashSet[Pos]]()
+
+proc newDAccepts[T](): DAccepts[T] =
+  result = newTable[DState, proc(s: string): T {.nimcall.}]()
 
 proc newDTran(): DTran =
   result = newTable[DState, DTranRow]()
@@ -49,20 +60,22 @@ proc newDTran(): DTran =
 proc newDTranRow(): DTranRow =
   result = newTable[char, DState]()
 
-proc collectPos(t: ReSynTree): set[Pos] =
+proc collectPos(t: ReSynTree): HashSet[Pos] =
   # error on tree with not unique positions when debug
+  result.init
   match t:
     Term(lit: l):
       match l:
         Empty:
-          return {}
+          return
         Char(pos: p, c: _):
-          return {p}
+          result.incl(p)
+          return
     Bin(op: _, left: l, right: r):
       let
         lr = l[].collectPos
         rr = r[].collectPos
-      assert lr * rr == {}
+      assert (lr * rr).len == 0
       return lr + rr
     Star(child: c):
       return c[].collectPos
@@ -76,7 +89,7 @@ proc collectChar(t: ReSynTree): set[char] =
         Char(pos: p, c: lc):
           match lc:
             End:
-              return {}
+              return
             Real(c: c):
               return {c}
     Bin(op: _, left: l, right: r):
@@ -101,14 +114,16 @@ proc nullable(t: ReSynTree): bool =
     Star:
       return true
 
-proc firstpos(t: ReSynTree): set[Pos] =
+proc firstpos(t: ReSynTree): HashSet[Pos] =
+  result.init
   match t:
     Term(lit: l):
       match l:
         Empty:
-          return {}
+          return
         Char(pos: p, c: _):
-          return {p}
+          result.incl(p)
+          return
     Bin(op: o, left: l, right: r):
       case o
       of bor:
@@ -121,14 +136,16 @@ proc firstpos(t: ReSynTree): set[Pos] =
     Star(child: c):
       return c[].firstpos
 
-proc lastpos(t: ReSynTree): set[Pos] =
+proc lastpos(t: ReSynTree): HashSet[Pos] =
+  result.init
   match t:
     Term(lit: l):
       match l:
         Empty:
-          return {}
+          return
         Char(pos: p, c: _):
-          return {p}
+          result.incl(p)
+          return
     Bin(op: o, left: l, right: r):
       case o
       of bor:
@@ -141,9 +158,10 @@ proc lastpos(t: ReSynTree): set[Pos] =
     Star(child: c):
       return c[].lastpos
 
-proc mergeSetTable[A; B](a: var TableRef[A, set[B]], b: TableRef[A, set[B]]) =
+proc mergeSetTable[A; B](a: var TableRef[A, HashSet[B]],
+                         b: TableRef[A, HashSet[B]]) =
   for k in b.keys:
-    a[k] = a.getOrDefault(k) + b[k]
+    a[k] = a.getOrDefault(k, initSet[B]()) + b[k]
 
 proc makeFollowposTable(t: ReSynTree): Pos2PosSet =
   # init
@@ -173,28 +191,14 @@ proc terms(t: ReSynTree): seq[Lit] =
     Star(child: c):
       return c[].terms
 
-proc makePosCharTable(t: ReSynTree): TableRef[Pos, char] =
-  result = newTable[Pos, char]()
-
-  for l in t.terms:
-    match l:
-      Char(pos: p, c: l):
-        match l:
-          Real(c: c):
-            result[p] = c
-          End:
-            continue
-      Empty:
-        continue
-
-proc makeCharPossetTable(t: ReSynTree): TableRef[char, set[Pos]] =
+proc makeCharPossetTable(t: ReSynTree): TableRef[char, HashSet[Pos]] =
   # init
   let
     chars = t.collectChar
 
-  result = newTable[char, set[Pos]]()
+  result = newTable[char, HashSet[Pos]]()
   for c in chars:
-    result[c] = {}
+    result[c] = initSet[Pos]()
 
   for l in t.terms:
     match l:
@@ -221,26 +225,24 @@ proc getAccPos(t: ReSynTree): Pos =
         continue
   assert false
 
-proc stateNum(d: DFA): int =
-  return d.states.card
-
-proc makeDFA(t: ReSynTree): DFA =
+proc makeDFA[T](lr: LexRe[T]): DFA[T] =
   let
+    t = lr.st
     followpos = t.makeFollowposTable
 
   var
     tran = newDTran()
-    states: set[DState] = {}
-    posS2DState = newTable[set[Pos], DSTate]()
-    unmarked: seq[set[Pos]] = @[]
+    stateNum = 0
+    posS2DState = newTable[HashSet[Pos], DSTate]()
+    unmarked: seq[HashSet[Pos]] = @[]
 
   # init
   let
     chars = t.collectChar
-    iState = DState(states.card)
+    iState = stateNum
     iSPos = t.firstpos
     charPosset = t.makeCharPossetTable
-  states.incl(iState)
+  inc(stateNum)
   posS2DState[iSPos] = iState
   unmarked.add(iSPos)
 
@@ -252,40 +254,31 @@ proc makeDFA(t: ReSynTree): DFA =
     tran[s] = newDTranRow()
     for c in chars:
       let posSet = ps * charPosset[c]
-      var newSPos: set[Pos] = {}
+      var newSPos: HashSet[Pos] = initSet[Pos]()
       for p in posSet:
         newSPos = newSPos + followpos[p]
       var nState: DState
       if posS2DState.hasKey(newSPos):
         nState = posS2DState[newSPos]
       else:
-        nState = DState(states.card)
+        nState = stateNum
+        inc(stateNum)
         unmarked.add(newSPos)
-        states.incl(nState)
         posS2DState[newSPos] = nState
       tran[s][c] = nState
 
   # make accepts
-  let acc = t.getAccPos
-  var accepts: set[DState] = {}
+  var accepts = newDAccepts[T]()
   for k in posS2DState.keys:
-    if acc in k:
-      accepts.incl(posS2DState[k])
+    for p in k:
+      if lr.accPosProc.haskey(p):
+        accepts[posS2DState[k]] = (lr.accPosProc[p])
 
   # make DFA
-  return DFA(start: iState, accepts: accepts, states: states, tran: tran)
+  return DFA[T](start: iState, accepts: accepts, stateNum: stateNum, tran: tran)
 
-#[
-iterator pairElm[A](s: set[A]): (A, A) =
-  var tmp = s
-  for e1 in s:
-    tmp.excl(e2)
-    for e2 in tmp:
-      yield (e1, e2)
-]#
-
-proc statePartTran(state: DState, parts: seq[set[DState]],
-                   dfa: DFA): TableRef[char, DState] =
+proc statePartTran[T](state: DState, parts: seq[HashSet[DState]],
+                      dfa: DFA[T]): TableRef[char, DState] =
   result = newTable[char, DState]()
   for c, s in dfa.tran[state]:
     for i, p in parts:
@@ -293,43 +286,46 @@ proc statePartTran(state: DState, parts: seq[set[DState]],
         result[c] = DState(i)
         break
 
-proc grind(parts: seq[set[DState]], dfa: DFA): seq[set[DState]] =
+proc grind[T](parts: seq[HashSet[DState]], dfa: DFA[T]): seq[HashSet[DState]] =
   result = @[]
   for setOfStates in parts:
-    var subparts: seq[(set[DState], TableRef[char, DState])] = @[]
+    var subparts: seq[(HashSet[DState], TableRef[char, DState])] = @[]
     for state in setOfStates:
       let sTran = state.statePartTran(parts, dfa)
       var isNewPart = true
       for i, sp in subparts:
         let (sos, tran) = sp
         if sTran == tran:
-          subparts[i] = (sos + {state}, tran)
+          var single = initSet[DState]()
+          single.incl(state)
+          subparts[i] = (sos + single, tran)
           isNewPart = false
           break
       if isNewPart:
-        subparts.add(({state}, sTran))
+        var single = initSet[DState]()
+        single.incl(state)
+        subparts.add((single, sTran))
 
     # add seq of state set to result
     for sp in subparts:
       result.add(sp[0])
 
-
-proc minimizeStates(input: DFA): DFA =
-  var partition: seq[set[DState]] = @[]
-  var newPartition: seq[set[DState]] = @[input.states - input.accepts,
-                                         input.accepts]
+proc minimizeStates[T](input: DFA[T], initPart: seq[HashSet[DState]]): DFA[T] =
+  var
+    partition: seq[HashSet[DState]] = @[]
+    newPartition = initPart
   while partition != newPartition:
     partition = newPartition
     newPartition = partition.grind(input)
 
-  result = DFA(tran: newDTran())
+  result = DFA[T](tran: newDTran(), accepts: newDAccepts[T]())
   for i, p in partition:
     if input.start in p:
-      result.start = DState(i)
-    for acc in input.accepts:
+      result.start = i
+    for acc in input.accepts.keys:
       if acc in p:
-        result.accepts.incl(DState(i))
-    result.states.incl(DState(i))
+        result.accepts[i] = input.accepts[acc]
+    inc(result.stateNum)
     for s in p:
-      result.tran[DState(i)] = s.statePartTran(partition, input)
+      result.tran[i] = s.statePartTran(partition, input)
       break

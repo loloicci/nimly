@@ -1,12 +1,9 @@
 type
-  State* = int16
-  CInt* = int8
-  StateSet* = set[State]
+  State = int
+  CInt = int
 
-  DBRow* = object
-    default*: State
-    base*: CInt
-
-  NCRow* = object
-    next*: State
-    check*: State
+  Defaults = seq[State]
+  Bases = seq[CInt]
+  Nexts = seq[State]
+  Checks = seq[State]
+  Accepts[A] = seq[proc(s: string): A]
