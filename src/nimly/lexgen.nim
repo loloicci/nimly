@@ -211,20 +211,6 @@ proc makeCharPossetTable(t: ReSynTree): TableRef[char, HashSet[Pos]] =
       Empty:
         continue
 
-proc getAccPos(t: ReSynTree): Pos =
-  let chars = t.collectChar
-  for l in t.terms:
-    match l:
-      Char(pos: p, c: l):
-        match l:
-          Real:
-            continue
-          End:
-            return p
-      Empty:
-        continue
-  assert false
-
 proc makeDFA[T](lr: LexRe[T]): DFA[T] =
   let
     t = lr.st
