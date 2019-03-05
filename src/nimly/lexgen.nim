@@ -315,3 +315,133 @@ proc minimizeStates[T](input: DFA[T], initPart: seq[HashSet[DState]]): DFA[T] =
     for s in p:
       result.tran[i] = s.statePartTran(partition, input)
       break
+
+proc defaultAndOther(dtr: DTranRow): (DState, DTranRow) =
+  var counts = newTable[DState, int]()
+  for s in dtr.values:
+    if not counts.hasKey(s):
+      counts[s] = 0
+    inc(counts[s])
+
+  var
+    default: DState
+    maxCnt: int = -1
+  for s, c in counts:
+    if maxCnt < c:
+      default = s
+      maxCnt = c
+
+  var resultTranRow = newDTranRow()
+
+  for c, s in dtr:
+    if s != default:
+      resultTranRow[c] = s
+
+  return (default, resultTranRow)
+
+proc longestEmpty(nc: seq[NC]): (int, int) =
+  ## return (start, length)
+  var
+    start = 0
+    length = 0
+    maxStart = 0
+    maxLen = 0
+    isReadingEmpty = false
+
+  # nc & @[DummyRow]
+  for i, r in nc & @[DataRow(0, 0)]:
+    # nothing
+    match r:
+      DataRow:
+        if isReadingEmpty:
+          inc(length)
+        else:
+          start = i
+          length = 1
+          isReadingEmpty = true
+      EmptyRow:
+        if isReadingEmpty:
+          if maxLen < length:
+            maxStart = start
+            maxLen = length
+            isReadingEmpty = false
+
+    return (maxStart, maxLen)
+
+proc minMaxCharIntOfRow(dtr: DTranRow): (int, int) =
+  ## return (min, max)
+  var
+    resultMin = 256
+    resultMax = -1
+  for c in dtr.keys:
+    resultMin = min(resultMin, int(c))
+    resultMax = max(resultMax, int(c))
+  assert resultMin < 256
+  assert resultMax > -1
+
+  return (resultMin, resultMax)
+
+proc writeRow(ncTable: var NCTable, index: int, nc: NC) =
+  if ncTable.len <= index:
+    for i in index..<ncTable.len:
+      ncTable.add(EmptyRow())
+    assert ncTable.len == index, "(" & $ncTable.len & " != " & $index & ")"
+    ncTable.add(nc)
+  else:
+    assert ncTable[index] == EmptyRow(), "Try to rewrite"
+    ncTable[index] = nc
+
+proc convertToLexData[T](dfa: DFA[T]): LexData[T] =
+  var
+    # first element is starting state
+    dbaTable: DBATable[T] = @[DBA[T]()]
+    ncTable: NCTable = @[]
+  for s, tr in dfa.tran:
+    let
+      (default, newTranRow) = tr.defaultAndOther
+      (ls, ll) = ncTable.longestEmpty
+      (minC, maxC) = newTranRow.minMaxCharIntOfRow
+    var
+      start: int
+      base: int
+    if maxC - minC >= ll:
+      start = ncTable.len
+    else:
+      start = ls
+    base = start - minC
+
+    for c, next in newTranRow:
+      ncTable.writeRow(base + int(c), DataRow(next=next, check=s))
+
+    var acc: Accept[T]
+    if dfa.accepts.haskey(s):
+      acc = Acc[T](dfa.accepts[s])
+    else:
+      acc = NotAcc[T]()
+
+    let dba = DBA[T](default: default, base: base, accept: acc)
+    if s == dfa.start:
+      dbaTable[0] = dba
+    else:
+      dbaTable.add(dba)
+
+  return LexData[T](dba: dbaTable, nc: ncTable)
+
+proc nextState[T](ld: LexData[T], s: State, a: char): State =
+  assert ld.dba.len > s, "(" & $ld.dba.len & " !> " & $s & ")"
+  assert s > -1, "(" & $s & " !> " & "-1)"
+  let
+    base = ld.dba[s].base
+    default = ld.dba[s].default
+    index = base + int(a)
+  if ld.nc.len <= index or index < 0:
+    return default
+  let nc = ld.nc[index]
+  match nc:
+    EmptyRow:
+      assert false
+    DataRow(n, c):
+      if c == s:
+        return n
+      else:
+        return default

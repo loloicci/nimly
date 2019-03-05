@@ -68,9 +68,10 @@ test "test correctChar":
   check dbookExampleSynT.collectChar == {'a', 'b'}
 
 template checkDFA[A](dfa: DFA[A]) =
-  let sa = dfa.tran[dfa.start]['a']
-  let sab = dfa.tran[sa]['b']
-  let acc = dfa.tran[sab]['b']
+  let
+    sa = dfa.tran[dfa.start]['a']
+    sab = dfa.tran[sa]['b']
+    acc = dfa.tran[sab]['b']
   check dfa.stateNum == 4
   check dfa.tran[dfa.start]['b'] == dfa.start
   check dfa.tran[sa]['a'] == sa
@@ -112,3 +113,23 @@ test "test minimizeStates":
   let minDFA = dfa.minimizeStates(@[acc, other])
 
   checkDFA(minDFA)
+
+test "test convertToLexData":
+  let
+    dfa = makeDFA[string](dbookExampleLexRe)
+    ld = convertToLexData[string](dfa)
+    sa = ld.nextState(0, 'a')
+    sab = ld.nextState(sa, 'b')
+    acc = ld.nextState(sab, 'b')
+  check ld.nc.len == 4
+  check ld.nextState(0, 'b') == 0
+  check ld.nextState(sa, 'a') == sa
+  check ld.nextState(sab, 'a') == sa
+  check ld.nextState(acc, 'a') == sa
+  check ld.nextState(acc, 'b') == 0
+  for i, dba in ld.dba:
+    if i == acc:
+      check dba.accept.kind == AcceptKind.Acc
+    else:
+      check dba.accept.kind == AcceptKind.NotAcc
+
