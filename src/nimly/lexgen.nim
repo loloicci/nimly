@@ -22,7 +22,7 @@ type
   DState = int
   DTranRow = TableRef[char, DState]
   DTran = TableRef[DState, DTranRow]
-  DAccepts[T] = TableRef[DState, proc(s: string): T {.nimcall.}]
+  DAccepts[T] = TableRef[DState, proc(token: LToken): T {.nimcall.}]
   DFA[T] = object
     start: DState
     accepts: DAccepts[T]
@@ -43,7 +43,7 @@ variant ReSynTree:
   Star(child: ref ReSynTree)
 
 type
-  AccPosProc[T] = TableRef[Pos, proc(s: string): T {.nimcall.}]
+  AccPosProc[T] = TableRef[Pos, proc(token: LToken): T {.nimcall.}]
   LexRe[T] = object
     st: ReSynTree
     accPosProc: AccPosProc[T]
@@ -52,7 +52,7 @@ proc newPos2PosSet(): Pos2PosSet =
   result = newTable[Pos, HashSet[Pos]]()
 
 proc newDAccepts[T](): DAccepts[T] =
-  result = newTable[DState, proc(s: string): T {.nimcall.}]()
+  result = newTable[DState, proc(token: LToken): T {.nimcall.}]()
 
 proc newDTran(): DTran =
   result = newTable[DState, DTranRow]()

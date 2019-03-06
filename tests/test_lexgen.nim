@@ -2,8 +2,8 @@ import unittest
 
 include nimly/lexgen
 
-proc strid(s: string): string =
-  return s
+proc strid(token: LToken): string =
+  return token.token
 
 let
   dbookExampleSynT = Bin(bcat,

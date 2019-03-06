@@ -4,9 +4,16 @@ type
   State = int
   CInt = int
 
+  # token
+  LToken = object
+    token: string
+    colNum: int
+    lineNum: int
+    lineInfo: string
+
 variant Accept[T]:
   NotAcc
-  Acc(fun: proc(s: string): T {.nimcall.})
+  Acc(fun: proc(token: LToken): T {.nimcall.})
 
 type
   DBA[T] = object
