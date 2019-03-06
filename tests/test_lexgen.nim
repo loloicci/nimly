@@ -133,3 +133,85 @@ test "test convertToLexData":
     else:
       check dba.accept.kind == AcceptKind.NotAcc
 
+proc doesAccept[T](dfa: DFA[T], str: string): bool =
+  var state = dfa.start
+  for c in str:
+    if (not dfa.tran[state].haskey(c)):
+      return false
+    state = dfa.tran[state][c]
+  return dfa.accepts.hasKey(state)
+
+proc makeDFAForTest(re: string): DFA[string] =
+  var nextPos = 0
+  let
+    rt = re.convertToReSynTree(nextPos)
+    accs = rt.accPos
+
+  var app = newAccPosProc[string]()
+
+  for acc in accs:
+    app[acc] = strid
+
+  let
+    lexRe = LexRe[string](
+      st: rt,
+      accPosProc: app)
+
+  return lexRe.makeDFA
+
+test "test convertToSynTree (test)":
+  let dfa = r"test".makeDFAForTest
+  check dfa.doesAccept("test")
+  check (not dfa.doesAccept("testing"))
+  check (not dfa.doesAccept("tes"))
+  check (not dfa.doesAccept(""))
+
+test "test convertToSynTree (([a..c][^a..c])+)":
+  let dfa = r"([a..c][^a..c])+".makeDFAForTest
+  check dfa.doesAccept("adbecf")
+  check dfa.doesAccept("c ")
+  check (not dfa.doesAccept(""))
+  check (not dfa.doesAccept("cast"))
+
+test "test convertToSynTree ((abc)?)":
+  let dfa = r"(abc)?".makeDFAForTest
+  check dfa.doesAccept("abc")
+  check dfa.doesAccept("")
+  check (not dfa.doesAccept("abcabc"))
+  check (not dfa.doesAccept("abcd"))
+  check (not dfa.doesAccept("ab"))
+
+test r"test convertToSynTree ([^\s]?)":
+  let dfa = r"[^\s]?".makeDFAForTest
+  check dfa.doesAccept("a")
+  check dfa.doesAccept("")
+  check (not dfa.doesAccept(" "))
+
+test r"test convertToSynTree (\w*)":
+  let dfa = r"\w*\\".makeDFAForTest
+  check dfa.doesAccept("test-01\\")
+  check (not dfa.doesAccept("test_02\\"))
+
+test "test convertToSynTree ((a{2,4}b|c{2,4}d)+e)":
+  let dfa = r"(a{2,4}b|c{2,4}d)+e".makeDFAForTest
+  check dfa.doesAccept("aabe")
+  check dfa.doesAccept("ccde")
+  check dfa.doesAccept("aaabe")
+  check dfa.doesAccept("cccde")
+  check dfa.doesAccept("aaaabe")
+  check dfa.doesAccept("ccccde")
+  check dfa.doesAccept("aabccccdaaaabccde")
+  check dfa.doesAccept("aaabcccdccccdccde")
+  check (not dfa.doesAccept("e"))
+  check (not dfa.doesAccept("abe"))
+  check (not dfa.doesAccept("cbe"))
+  check (not dfa.doesAccept("aaaaabe"))
+  check (not dfa.doesAccept("cccccde"))
+
+test "test convertToSynTree (.*)":
+  let dfa = r".*".makeDFAForTest
+  check dfa.doesAccept("test")
+  check dfa.doesAccept("this is test.")
+  check dfa.doesAccept("tess \n is \n test.")
+  check dfa.doesAccept("")
+  check dfa.doesAccept("()*")

@@ -15,18 +15,18 @@ Example is as follows.
 .. code-block:: nim
 
   niml myLexer:
-    "if":
+    r"if":
       ## this part converted to procbody.
       ## the arg is (token: LToken).
       return TokenIf()
-    "else":
+    r"else":
       return TokenElse()
-    "true":
+    r"true":
       return TokenTrue()
-    "false":
+    r"false":
       return TokenFalse()
     ## you can use ``..`` instead of ``-`` in ``[]``.
-    "[a..zA..Z-_][a..zA..Z0..9\-_]*":
+    r"[a..zA..Z-_][a..zA..Z0..9\-_]*":
       return TokenIdentifier(token)
 
 This makes a LexData object named myLexer.
@@ -36,7 +36,6 @@ Meta charactors are as following:
 - ``\``: escape character
 - ``.``: match with any charactor
 - ``[``: start of character class
-- ``]``: end of character class
 - ``|``: means or
 - ``(``: start of subpattern
 - ``)``: end of subpattern
@@ -49,7 +48,7 @@ In ``[]``, meta charactors are as following
 
 - ``\``: escape character
 - ``^``: negate character (only in first position)
-- ``]``: end of class
+- ``]``: end of this class
 - ``-``: specify character range (``..`` can be used instead of this)
 
 Each of followings is recognized as character set.

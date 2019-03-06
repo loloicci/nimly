@@ -1,5 +1,6 @@
 import tables
 import sets
+import strutils
 import patty
 
 include lextypes
@@ -8,7 +9,6 @@ include lextypes
 proc `~`[T](obj: T): ref T =
   new(result)
   result[] = obj
-
 
 type
   # for SynTree
@@ -48,6 +48,9 @@ type
     st: ReSynTree
     accPosProc: AccPosProc[T]
 
+proc newAccPosProc[T](): AccPosProc[T] =
+  result = newTable[Pos, proc(token: LToken): T {.nimcall.}]()
+
 proc newPos2PosSet(): Pos2PosSet =
   result = newTable[Pos, HashSet[Pos]]()
 
@@ -59,6 +62,79 @@ proc newDTran(): DTran =
 
 proc newDTranRow(): DTranRow =
   result = newTable[char, DState]()
+
+proc accPosImplDebug(t: ReSynTree): seq[Pos] =
+  result = @[]
+  match t:
+    Term(lit: l):
+      match l:
+        Empty:
+          return @[]
+        Char(pos: p, c: c):
+          if c.kind == LCharKind.End:
+            result &= p
+          else:
+            return @[]
+    Star(child: c):
+      result = result & c[].accPosImplDebug
+    Bin(op:_, left: l, right: r):
+      result = result & r[].accPosImplDebug
+      result = result & l[].accPosImplDebug
+
+proc accPosImpl(t: ReSynTree): seq[Pos] =
+  result = @[]
+  match t:
+    Term(lit: l):
+      match l:
+        Empty:
+          return @[]
+        Char(pos: p, c: c):
+          if c.kind == LCharKind.End:
+            return @[p]
+          else:
+            return @[]
+    Star(child: c):
+      result = c[].accPosImpl
+      if result.len > 0:
+        return
+    Bin(op:_, left: l, right: r):
+      result = r[].accPosImpl
+      if result.len > 0:
+        return
+      result = l[].accPosImpl
+      if result.len > 0:
+        return
+
+when not defined(release):
+  import sequtils
+
+proc accPos(t: ReSynTree): seq[Pos] =
+  ## use it if acc is only one position
+  when defined(release):
+    result = t.accPosImpl
+  else:
+    result = t.accPosImplDebug.deduplicate
+    doassert result.len > 0, "No acc node"
+
+proc reassignPos(t: ReSynTree, nextPos: var int): ReSynTree =
+  match t:
+    Term(lit: l):
+      match l:
+        Empty:
+          return Term(Empty())
+        Char(pos: _, c: c):
+          result = Term(Char(pos = nextPos, c = c))
+          inc(nextPos)
+          return
+    Bin(op: op, left: l, right: r):
+      let
+        left = ~l[].reassignPos(nextPos)
+        right = ~r[].reassignPos(nextPos)
+      return Bin(op = op,
+                 left = left,
+                 right = right)
+    Star(child: c):
+      return Star(child = ~c[].reassignPos(nextPos))
 
 proc collectPos(t: ReSynTree): HashSet[Pos] =
   # error on tree with not unique positions when debug
@@ -261,7 +337,8 @@ proc makeDFA[T](lr: LexRe[T]): DFA[T] =
         accepts[posS2DState[k]] = (lr.accPosProc[p])
 
   # make DFA
-  return DFA[T](start: iState, accepts: accepts, stateNum: stateNum, tran: tran)
+  return DFA[T](start: iState, accepts: accepts,
+                stateNum: stateNum, tran: tran)
 
 proc statePartTran[T](state: DState, parts: seq[HashSet[DState]],
                       dfa: DFA[T]): TableRef[char, DState] =
@@ -301,7 +378,8 @@ proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
       result = true
   parts = retParts
 
-proc minimizeStates[T](input: DFA[T], initPart: seq[HashSet[DState]]): DFA[T] =
+proc minimizeStates[T](input: DFA[T],
+                       initPart: seq[HashSet[DState]]): DFA[T] =
   var
     partition = initPart
     didChange = true
@@ -449,3 +527,275 @@ proc nextState[T](ld: LexData[T], s: State, a: char): State =
         return n
       else:
         return default
+
+variant RePart:
+  RChar(c: char)
+  Special(sc: char)
+  Brace(s: int, e: int)
+  Tree(tree: ReSynTree)
+
+const
+  allChars = {char(0)..char(255)}
+  dChars = {'0'..'9'}
+  nDChars = allChars - dChars
+  sChars = {' ', '\t', '\n', '\r', '\f', '\v'}
+  nSChars = allChars - sChars
+  wChars = {'a'..'z', 'A'..'Z', '0'..'9', '-'}
+  nWChars = allChars - wChars
+  classTable = {'d': dChars, 'D': nDChars, 's': sChars, 'S': nSChars,
+                 'w': wChars, 'W': nWChars, '.': allChars}.toTable()
+  readingClass = int8(0)
+  readingEscape = int8(1)
+  readingDot = int8(2)
+  classHead = int8(3)
+  readingBraceS = int8(4)
+  readingBraceE = int8(5)
+  readingClassRange = int8(6)
+  classNegate = int8(7)
+
+
+proc classIncl(class: var set[char], c: char,
+               classBfr: var int, flag: var set[int8]) =
+  if readingClassRange in flag:
+    doassert classBfr >= 0, "invalid - or .. in class"
+    class = class + {char(classBfr)..c}
+    classBfr = -1
+    flag.excl(readingClassRange)
+  else:
+    class.incl(c)
+    classBfr = int(c)
+
+proc classUnion(class: var set[char], s: set[char],
+                 classBfr: var int, flag: var set[int8]) =
+  assert (not (readingClassRange in flag)), "invalid - or .. in class"
+  classBfr = -1
+  class = class + s
+
+proc convertToTree(input: set[char]): ReSynTree =
+  var isFirst = true
+  for c in input:
+    if isFirst:
+      result = Term(lit = Char(pos = -1, c = Real(c = c)))
+      isFirst = false
+    else:
+      result = Bin(op = bor,
+                   left = ~Term(lit = Char(pos = -1, c = Real(c = c))),
+                   right = ~result)
+
+  doassert (not isFirst), "There are some empty character class"
+
+proc convertToSeqRePart(re: string): seq[RePart] =
+  result = @[]
+
+  var
+    flag: set[int8] = {}
+    class: set[char] = {}
+    classBfr = -1
+    braceS = ""
+    braceE = ""
+
+  for i, c in re:
+    if readingClass in flag:
+      if readingEscape in flag:
+        case c
+        of ']', '\\', '-':
+          class.classIncl(c, classBfr, flag)
+        of '^':
+          doassert class.card == 0, "invalid escaping for ^ in class"
+          class.classIncl(c, classBfr, flag)
+        of 'd', 'D', 's', 'S', 'w', 'W':
+          class.classUnion(classTable[c], classBfr, flag)
+        else:
+          assert false, "invalid escaping in class"
+        flag.excl(readingEscape)
+      else:
+        if readingDot in flag:
+          flag.excl(readingDot)
+          if c == '.':
+            flag.incl(readingClassRange)
+            continue
+          else:
+            class.classIncl(c, classBfr, flag)
+        case c
+        of '\\':
+          flag.incl(readingEscape)
+        of '-':
+          flag.incl(readingClassRange)
+        of '.':
+          flag.incl(readingDot)
+        of '^':
+          if class.card == 0:
+            flag.incl(classNegate)
+          else:
+            class.classIncl(c, classBfr, flag)
+        of ']':
+          doassert (not (readingClassRange in flag)), "invalid - or .. in []"
+          if classNegate in flag:
+            class = allChars - class
+          result.add(Tree(class.convertToTree))
+          class = {}
+          classBfr = -1
+          flag.excl(classNegate)
+          flag.excl(readingClass)
+        else:
+          class.classIncl(c, classBfr, flag)
+    elif readingBraceS in flag:
+      doassert c in dChars + {' ', ',', '}'}, "invalid {}"
+      if c in dChars:
+        braceS &= c
+      elif c == ',':
+        flag.excl(readingBraceS)
+        flag.incl(readingBraceE)
+      elif c == '}':
+        result.add(Brace(s=braceS.parseInt, e=braceS.parseInt))
+        braceS = ""
+        braceE = ""
+        flag.excl(readingBraceS)
+    elif readingBraceE in flag:
+      doassert c in dChars + {' ', '}'}, "invalid {}"
+      if c in dChars:
+        braceE &= c
+      elif c == '}':
+        result.add(Brace(s=braceS.parseInt, e=braceE.parseInt))
+        braceS = ""
+        braceE = ""
+        flag.excl(readingBraceE)
+    else:
+      if readingEscape in flag:
+        case c
+        of '\\', '.', '[', '|', '(', ')', '?', '*', '+', '{':
+          result.add(RChar(c=c))
+        of 'd', 'D', 's', 'S', 'w', 'W':
+          result.add(Tree(classTable[c].convertToTree))
+        else:
+          doassert false, "Invalid escaping"
+        flag.excl(readingEscape)
+      else:
+        case c
+        of '\\':
+          flag.incl(readingEscape)
+        of '.':
+          result.add(Tree(allChars.convertToTree))
+        of '[':
+          assert (not (classNegate in flag))
+          assert (not (readingClassRange in flag))
+          assert classBfr == -1
+          assert class.card == 0
+          flag.incl(readingClass)
+        of '{':
+          flag.incl(readingBraceS)
+        of '|', '(', ')', '?', '*', '+':
+          result.add(Special(sc=c))
+        else:
+          result.add(RChar(c=c))
+
+proc toTree(input: RePart): ReSynTree =
+  match input:
+    RChar(c: c):
+      result = Term(lit = Char(pos = -1, c = Real(c = c)))
+    Tree(tree: t):
+      result = t
+    Brace:
+      doassert false, "Invalid Re (Brace)"
+    Special(sc: sc):
+      doassert false, "Invalid Re (" & $sc & ")"
+
+proc treeQuestion(input: RePart): ReSynTree =
+  result = Bin(op = bor,
+               left = ~Term(lit = Empty()),
+               right = ~input.toTree())
+
+proc treeStar(input: RePart): ReSynTree =
+  result = Star(child = ~input.toTree)
+
+proc treePlus(input: RePart): ReSynTree =
+  result = Bin(op = bcat,
+               left = ~input.toTree,
+               right = ~Star(child = ~input.toTree))
+
+proc treeBrace(input: RePart, s, e: int): ReSynTree =
+  result = input.toTree
+  for i in 0..(e - s):
+    result = Bin(op = bor,
+                 left = ~Term(Empty()),
+                 right = ~Bin(op = bcat,
+                              left = ~input.toTree,
+                              right = ~result))
+  for i in 0..<s:
+    result = Bin(op = bcat,
+                 left = ~input.toTree,
+                 right = ~result)
+
+proc handleQuantifier(input: seq[RePart]): seq[RePart] =
+  result = @[]
+  var bfr = input[0]
+  for i, rp in input[1..(input.len - 1)]:
+    match rp:
+      RChar(c: c):
+        if bfr.kind in {RePartKind.RChar, RePartKind.Tree}:
+          result.add(bfr)
+      Special(sc: c):
+        doassert (bfr.kind != RePartKind.Special and
+                  bfr.kind != RePartKind.Brace), "invalid quantifier"
+        case c
+        of '?':
+          result.add(Tree(tree = bfr.treeQuestion))
+        of '*':
+          result.add(Tree(tree = bfr.treeStar))
+        of '+':
+          result.add(Tree(tree = bfr.treePlus))
+        of '|':
+          if bfr.kind in {RePartKind.RChar, RePartKind.Tree}:
+            result.add(bfr)
+          result.add(rp)
+        else:
+          assert false, "'" & $c & "' cannot exists here"
+      Brace(s: s, e: e):
+        doassert (bfr.kind != RePartKind.Special and
+                  bfr.kind != RePartKind.Brace), "invalid quantifier"
+        result.add(Tree(tree = bfr.treeBrace(s, e)))
+      Tree(tree: t):
+        if bfr.kind in {RePartKind.RChar, RePartKind.Tree}:
+          result.add(bfr)
+    bfr = rp
+  if bfr.kind in {RePartKind.RChar, RePartKind.Tree}:
+    result.add(bfr)
+
+proc handleCat(input: seq[RePart]): ReSynTree =
+  var ip = input
+  if ip.len > 0:
+    result = ip.pop.toTree
+  while ip.len > 0:
+    result = Bin(op = bcat,
+                 left = ~ip.pop.toTree,
+                 right = ~result)
+
+proc handleOr(input: seq[RePart]): ReSynTree =
+  for i, rp in input:
+    if rp.kind == RePartKind.Special and rp.sc == '|':
+      return Bin(op = bor,
+                 left = ~input[0..(i - 1)].handleCat,
+                 right = ~input[(i + 1)..(input.len - 1)].handleOr)
+  return input.handleCat
+
+proc handleSubpattern(input: seq[RePart]): ReSynTree =
+  var
+    startPos = -1
+  for i, rp in input:
+    if rp.kind == RePartKind.Special and rp.sc == '(':
+      startPos = i
+    elif rp.kind == RePartKind.Special and rp.sc == ')':
+      doassert startPos > -1, "Invalid end of Paren"
+      return (
+        input[0..<startPos] &
+        Tree(input[(startPos + 1)..<i].handleQuantifier.handleOr) &
+        input[(i + 1)..<input.len]
+        ).handleSubpattern
+  doassert startPos < 0, "Invalid start of Paren"
+  return input.handleQuantifier.handleOr
+
+proc convertToReSynTree(re: string, nextPos: var int): ReSynTree =
+  result = Bin(op = bcat,
+               left = ~re.convertToSeqRePart.handleSubpattern,
+               right = ~Term(lit = Char(pos = -1, c = End()))).reassignPos(
+                 nextPos)
