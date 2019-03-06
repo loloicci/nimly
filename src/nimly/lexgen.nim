@@ -272,8 +272,10 @@ proc statePartTran[T](state: DState, parts: seq[HashSet[DState]],
         result[c] = DState(i)
         break
 
-proc grind[T](parts: seq[HashSet[DState]], dfa: DFA[T]): seq[HashSet[DState]] =
-  result = @[]
+proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
+  ## return true if grind effects
+  result = false
+  var retParts: seq[HashSet[DState]] = @[]
   for setOfStates in parts:
     var subparts: seq[(HashSet[DState], TableRef[char, DState])] = @[]
     for state in setOfStates:
@@ -292,17 +294,19 @@ proc grind[T](parts: seq[HashSet[DState]], dfa: DFA[T]): seq[HashSet[DState]] =
         single.incl(state)
         subparts.add((single, sTran))
 
-    # add seq of state set to result
+    # add seq of state set to renew parts
     for sp in subparts:
-      result.add(sp[0])
+      retParts.add(sp[0])
+    if subparts.len > 1:
+      result = true
+  parts = retParts
 
 proc minimizeStates[T](input: DFA[T], initPart: seq[HashSet[DState]]): DFA[T] =
   var
-    partition: seq[HashSet[DState]] = @[]
-    newPartition = initPart
-  while partition != newPartition:
-    partition = newPartition
-    newPartition = partition.grind(input)
+    partition = initPart
+    didChange = true
+  while didChange:
+    didChange = partition.grind(input)
 
   result = DFA[T](tran: newDTran(), accepts: newDAccepts[T]())
   for i, p in partition:
