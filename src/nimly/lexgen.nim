@@ -23,7 +23,7 @@ type
   DState = int
   DTranRow = TableRef[char, DState]
   DTran = TableRef[DState, DTranRow]
-  DAccepts[T] = TableRef[DState, proc(token: LToken): T {.nimcall.}]
+  DAccepts[T] = TableRef[DState, AccProc[T]]
   DFA[T] = object
     start: DState
     accepts: DAccepts[T]
@@ -50,13 +50,13 @@ type
     accPosProc*: AccPosProc[T]
 
 proc newAccPosProc*[T](): AccPosProc[T] =
-  result = newTable[Pos, proc(token: LToken): T {.nimcall.}]()
+  result = newTable[Pos, AccProc[T]]()
 
 proc newPos2PosSet(): Pos2PosSet =
   result = newTable[Pos, HashSet[Pos]]()
 
 proc newDAccepts[T](): DAccepts[T] =
-  result = newTable[DState, proc(token: LToken): T {.nimcall.}]()
+  result = newTable[DState, AccProc[T]]()
 
 proc newDTran(): DTran =
   result = newTable[DState, DTranRow]()
