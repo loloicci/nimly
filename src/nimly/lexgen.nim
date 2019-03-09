@@ -4,17 +4,17 @@ import strutils
 import macros
 import patty
 
-include lextypes
+import lextypes
 
 
-proc `~`[T](obj: T): ref T =
+proc `~`*[T](obj: T): ref T =
   new(result)
   result[] = obj
 
 type
   # for SynTree
-  Pos = int
-  BOp = enum
+  Pos* = int
+  BOp* = enum
     bor,
     bcat
   Pos2PosSet = TableRef[Pos, HashSet[Pos]]
@@ -29,8 +29,6 @@ type
     accepts: DAccepts[T]
     stateNum: int
     tran: DTran
-const
-  deadState: DState = -1
 
 variant LChar:
   End
@@ -40,18 +38,18 @@ variant Lit:
   Empty
   Char(pos: Pos, c: LChar)
 
-variant ReSynTree:
+variantp ReSynTree:
   Term(lit: Lit)
   Bin(op: BOp, left: ref ReSynTree, right: ref ReSynTree)
   Star(child: ref ReSynTree)
 
 type
-  AccPosProc[T] = TableRef[Pos, proc(token: LToken): T {.nimcall.}]
-  LexRe[T] = object
-    st: ReSynTree
-    accPosProc: AccPosProc[T]
+  AccPosProc[T] = TableRef[Pos, AccProc[T]]
+  LexRe*[T] = object
+    st*: ReSynTree
+    accPosProc*: AccPosProc[T]
 
-proc newAccPosProc[T](): AccPosProc[T] =
+proc newAccPosProc*[T](): AccPosProc[T] =
   result = newTable[Pos, proc(token: LToken): T {.nimcall.}]()
 
 proc newPos2PosSet(): Pos2PosSet =
@@ -111,7 +109,7 @@ proc accPosImpl(t: ReSynTree): seq[Pos] =
 when not defined(release):
   import sequtils
 
-proc accPos(t: ReSynTree): seq[Pos] =
+proc accPos*(t: ReSynTree): seq[Pos] =
   ## use it if acc is only one position
   when defined(release):
     result = t.accPosImpl
@@ -290,7 +288,7 @@ proc makeCharPossetTable(t: ReSynTree): TableRef[char, HashSet[Pos]] =
       Empty:
         continue
 
-proc makeDFA[T](lr: LexRe[T]): DFA[T] =
+proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
   let
     t = lr.st
     followpos = t.makeFollowposTable
@@ -433,7 +431,7 @@ proc minimizeStates[T](input: DFA[T],
 
   result = result.removeDead
 
-proc minimizeStates[T](input: DFA[T]): DFA[T] =
+proc minimizeStates*[T](input: DFA[T]): DFA[T] =
   ## needs all accepts correspond unique cloud
   var
     initPart: seq[HashSet[DState]] = @[]
@@ -527,7 +525,7 @@ proc writeRow(ncTable: var NCTable, index: int, nc: NC, force = false) =
       assert ncTable[index] == EmptyRow(), "Try to rewrite"
     ncTable[index] = nc
 
-proc convertToLexData[T](dfa: DFA[T]): LexData[T] =
+proc convertToLexData*[T](dfa: DFA[T]): LexData[T] =
   var
     # first element is starting state
     dbaTable: DBATable[T] = @[DBA[T]()]
@@ -578,7 +576,7 @@ proc convertToLexData[T](dfa: DFA[T]): LexData[T] =
 
   return LexData[T](dba: dbaTable, nc: ncTable)
 
-proc nextState[T](ld: LexData[T], s: State, a: char): State =
+proc nextState*[T](ld: LexData[T], s: State, a: char): State =
   assert ld.dba.len > s, "(" & $ld.dba.len & " !> " & $s & ")"
   assert s > -1, "(" & $s & " !> " & "-1)"
   let
@@ -863,13 +861,16 @@ proc handleSubpattern(input: seq[RePart]): ReSynTree =
   doassert startPos < 0, "Invalid start of Paren"
   return input.handleQuantifier.handleOr
 
-proc convertToReSynTree(re: string, nextPos: var int): ReSynTree =
+proc convertToReSynTree*(re: string, nextPos: var int): ReSynTree =
   result = Bin(op = bcat,
                left = ~re.convertToSeqRePart.handleSubpattern,
                right = ~Term(lit = Char(pos = -1, c = End()))).reassignPos(
                  nextPos)
 
-macro nimly(name, body: untyped): untyped =
+export tables
+export sets
+
+macro nimly*(name, body: untyped): untyped =
   name.expectKind(nnkBracketExpr)
   body.expectKind(nnkStmtList)
   let
