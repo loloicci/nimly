@@ -11,9 +11,11 @@ type
     lineNum: int
     lineInfo: string
 
+type AccProc[T] = proc(token: LToken): T {.nimcall.}
+
 variant Accept[T]:
   NotAcc
-  Acc(fun: proc(token: LToken): T {.nimcall.})
+  Acc(fun: AccProc[T])
 
 type
   DBA[T] = object

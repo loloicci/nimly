@@ -121,7 +121,9 @@ test "test convertToLexData":
     sa = ld.nextState(0, 'a')
     sab = ld.nextState(sa, 'b')
     acc = ld.nextState(sab, 'b')
-  check ld.nc.len == 4
+  check sa != deadState
+  check sab != deadState
+  check acc != deadState
   check ld.nextState(0, 'b') == 0
   check ld.nextState(sa, 'a') == sa
   check ld.nextState(sab, 'a') == sa
@@ -140,6 +142,24 @@ proc doesAccept[T](dfa: DFA[T], str: string): bool =
       return false
     state = dfa.tran[state][c]
   return dfa.accepts.hasKey(state)
+
+proc finalState[T](ld: LexData[T], str: string): int =
+  result = 0
+  for c in str:
+    result = ld.nextState(result, c)
+    if result == deadState:
+      return
+
+proc doesAccept[T](ld: LexData[T], str: string): bool =
+  let fs = finalState[T](ld, str)
+  if fs == deadState:
+    return false
+  return ld.dba[fs].accept.kind == AcceptKind.Acc
+
+proc accProc[T](ld: LexData[T], str: string): AccProc[T] =
+  let fs = finalState[T](ld, str)
+  assert ld.dba[fs].accept.kind == AcceptKind.Acc
+  return ld.dba[fs].accept.fun
 
 proc makeDFAForTest(re: string): DFA[string] =
   var nextPos = 0
@@ -215,3 +235,26 @@ test "test convertToSynTree (.*)":
   check dfa.doesAccept("tess \n is \n test.")
   check dfa.doesAccept("")
   check dfa.doesAccept("()*")
+
+test "test macro nimly (if)":
+  nimly testLex[string]:
+    r"if":
+      return "acc"
+  check testLex.doesAccept("if")
+  check testLex.accProc("if")(LToken(token: "if")) == "acc"
+  check (not testLex.doesAccept("i"))
+  check (not testLex.doesAccept("else"))
+  check (not testLex.doesAccept("iff"))
+
+test "test macro nimly (if)":
+  nimly testLex[string]:
+    r"if":
+      return token.token
+    r"else":
+      return "acc"
+  check testLex.doesAccept("if")
+  check testLex.accProc("if")(LToken(token: "if")) == "if"
+  check (not testLex.doesAccept("i"))
+  check testLex.doesAccept("else")
+  check testLex.accProc("else")(LToken(token: "else")) == "acc"
+  check (not testLex.doesAccept("iff"))

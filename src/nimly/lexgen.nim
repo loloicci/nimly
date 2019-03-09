@@ -1,6 +1,7 @@
 import tables
 import sets
 import strutils
+import macros
 import patty
 
 include lextypes
@@ -28,6 +29,8 @@ type
     accepts: DAccepts[T]
     stateNum: int
     tran: DTran
+const
+  deadState: DState = -1
 
 variant LChar:
   End
@@ -378,6 +381,36 @@ proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
       result = true
   parts = retParts
 
+proc removeDead[T](input: DFA[T]): DFA[T] =
+  var dead = initSet[DState]()
+  for s, tr in input.tran:
+    if input.accepts.haskey(s):
+      continue
+    var f = true
+    for ns in tr.values:
+      if s != ns:
+        f = false
+        break
+    if f:
+      dead.incl(s)
+  var newTran = newDTran()
+  for s, tr in input.tran:
+    if s in dead:
+      continue
+    var newRow = newDTranRow()
+    for c, ns in tr:
+      if ns in dead:
+        newRow[c] = deadState
+      else:
+        newRow[c] = ns
+    newTran[s] = newRow
+  result = DFA[T](
+    start: input.start,
+    accepts: input.accepts,
+    stateNum: input.stateNum - dead.card,
+    tran: newTran
+  )
+
 proc minimizeStates[T](input: DFA[T],
                        initPart: seq[HashSet[DState]]): DFA[T] =
   var
@@ -398,9 +431,29 @@ proc minimizeStates[T](input: DFA[T],
       result.tran[i] = s.statePartTran(partition, input)
       break
 
+  result = result.removeDead
+
+proc minimizeStates[T](input: DFA[T]): DFA[T] =
+  ## needs all accepts correspond unique cloud
+  var
+    initPart: seq[HashSet[DState]] = @[]
+    other = initSet[DState]()
+  for i in 0..<input.stateNum:
+    other.incl(i)
+
+  for k in input.accepts.keys:
+    var single = initSet[DState]()
+    single.incl(k)
+    other.excl(k)
+    initPart.add(single)
+  initPart.add(other)
+
+  result = input.minimizeStates(initPart)
+
 proc defaultAndOther(dtr: DTranRow): (DState, DTranRow) =
   var counts = newTable[DState, int]()
-  for s in dtr.values:
+  for i in {0..255}:
+    let s = dtr.getOrDefault(char(i), deadState)
     if not counts.hasKey(s):
       counts[s] = 0
     inc(counts[s])
@@ -415,9 +468,10 @@ proc defaultAndOther(dtr: DTranRow): (DState, DTranRow) =
 
   var resultTranRow = newDTranRow()
 
-  for c, s in dtr:
-    if s != default:
-      resultTranRow[c] = s
+  for i in {0..255}:
+    let ns = dtr.getOrDefault(char(i), deadState)
+    if ns != default:
+      resultTranRow[char(i)] = ns
 
   return (default, resultTranRow)
 
@@ -458,19 +512,19 @@ proc minMaxCharIntOfRow(dtr: DTranRow): (int, int) =
   for c in dtr.keys:
     resultMin = min(resultMin, int(c))
     resultMax = max(resultMax, int(c))
-  assert resultMin < 256
-  assert resultMax > -1
-
+  if resultMin == 256:
+    return (0, 0)
   return (resultMin, resultMax)
 
-proc writeRow(ncTable: var NCTable, index: int, nc: NC) =
+proc writeRow(ncTable: var NCTable, index: int, nc: NC, force = false) =
   if ncTable.len <= index:
-    for i in index..<ncTable.len:
+    for i in ncTable.len..<index:
       ncTable.add(EmptyRow())
     assert ncTable.len == index, "(" & $ncTable.len & " != " & $index & ")"
     ncTable.add(nc)
   else:
-    assert ncTable[index] == EmptyRow(), "Try to rewrite"
+    if not force:
+      assert ncTable[index] == EmptyRow(), "Try to rewrite"
     ncTable[index] = nc
 
 proc convertToLexData[T](dfa: DFA[T]): LexData[T] =
@@ -478,6 +532,9 @@ proc convertToLexData[T](dfa: DFA[T]): LexData[T] =
     # first element is starting state
     dbaTable: DBATable[T] = @[DBA[T]()]
     ncTable: NCTable = @[]
+    # state -> newState, base, newTran
+    stateTable = newTable[int, (int, int, DTranRow)]()
+  assert dbaTable.len == 1
   for s, tr in dfa.tran:
     let
       (default, newTranRow) = tr.defaultAndOther
@@ -493,7 +550,9 @@ proc convertToLexData[T](dfa: DFA[T]): LexData[T] =
     base = start - minC
 
     for c, next in newTranRow:
-      ncTable.writeRow(base + int(c), DataRow(next=next, check=s))
+      # Dummy
+      ncTable.writeRow(base + int(c),
+                       DataRow(next = -2, check = -2))
 
     var acc: Accept[T]
     if dfa.accepts.haskey(s):
@@ -503,9 +562,19 @@ proc convertToLexData[T](dfa: DFA[T]): LexData[T] =
 
     let dba = DBA[T](default: default, base: base, accept: acc)
     if s == dfa.start:
+      stateTable[s] = (0, base, newTranRow)
       dbaTable[0] = dba
     else:
+      stateTable[s] = (dbaTable.len, base, newTranRow)
       dbaTable.add(dba)
+  for k, v in stateTable:
+    for c, next in v[2]:
+      ncTable.writeRow(v[1] + int(c),
+                       DataRow(
+                         next = stateTable[next][0],
+                         check = v[0]),
+                       force = true)
+
 
   return LexData[T](dba: dbaTable, nc: ncTable)
 
@@ -521,7 +590,7 @@ proc nextState[T](ld: LexData[T], s: State, a: char): State =
   let nc = ld.nc[index]
   match nc:
     EmptyRow:
-      assert false
+      return default
     DataRow(n, c):
       if c == s:
         return n
@@ -799,3 +868,258 @@ proc convertToReSynTree(re: string, nextPos: var int): ReSynTree =
                left = ~re.convertToSeqRePart.handleSubpattern,
                right = ~Term(lit = Char(pos = -1, c = End()))).reassignPos(
                  nextPos)
+
+macro nimly(name, body: untyped): untyped =
+  name.expectKind(nnkBracketExpr)
+  body.expectKind(nnkStmtList)
+  let
+    nameStr = $name[0].ident
+    typeIdent = name[1].ident
+  result = newStmtList()
+  var
+    procs: seq[NimNode] = @[]
+    lexerMakerBody = newStmtList()
+
+  # var newPos = 0
+  lexerMakerBody.add(
+    newVarStmt(
+      newIdentNode("newPos"),
+      newIntLitNode(0))
+  )
+  # var app = newAccPosProc[T]()
+  lexerMakerBody.add(
+    newVarStmt(
+      newIdentNode("app"),
+      newCall(
+        newTree(
+          nnkBracketExpr,
+          newIdentNode("newAccPosProc"),
+          newIdentNode(typeIdent)
+        )
+      )
+    )
+  )
+  # var wholeRst: ReSynTree
+  lexerMakerBody.add(
+    newTree(
+      nnkVarSection,
+      newTree(
+        nnkIdentDefs,
+        newIdentNode("wholeRst"),
+        newIdentNode("ReSynTree"),
+        newEmptyNode()
+      )
+    )
+  )
+  # var acc: seq[Pos]
+  lexerMakerBody.add(
+    nnkStmtList.newTree(
+      nnkVarSection.newTree(
+        nnkIdentDefs.newTree(
+          newIdentNode("acc"),
+          nnkBracketExpr.newTree(
+            newIdentNode("seq"),
+            newIdentNode("Pos")
+          ),
+          newEmptyNode()
+        )
+      )
+    )
+  )
+  # var rst: ReSynTree
+  lexerMakerBody.add(
+    nnkStmtList.newTree(
+      nnkVarSection.newTree(
+        nnkIdentDefs.newTree(
+          newIdentNode("rst"),
+          newIdentNode("ReSynTree"),
+          newEmptyNode()
+        )
+      )
+    )
+  )
+  if body.len < 1:
+    error "no cloud"
+  for i, cloud in body:
+    cloud.expectKind(nnkCall)
+    cloud[0].expectKind({nnkRStrLit, nnkStrLit})
+    cloud[1].expectKind(nnkStmtList)
+    let
+      reStr = cloud[0].strVal
+      param = newTree(nnkIdentDefs,
+                      newIdentNode("token"),
+                      newIdentNode("LToken"),
+                      newEmptyNode())
+    let
+      procName = newIdentNode("procForCloud" & nameStr & $i)
+      procNode = newProc(
+        name = procName,
+        params = @[newIdentNode(typeIdent), param],
+        body = cloud[1]
+      )
+    procs.add(procNode)
+    # rst = (meta cloud[0]).convertToReSynTree(newPos)
+    lexerMakerBody.add(
+      newAssignment(
+        newIdentNode("rst"),
+        newCall(
+          newIdentNode("convertToReSynTree"),
+          cloud[0],
+          newIdentNode("newPos")
+        )
+      )
+    )
+    if i == 0:
+      # wholeRst = rst
+      lexerMakerBody.add(
+        newAssignment(
+          newIdentNode("wholeRst"),
+          newIdentNode("rst")
+        )
+      )
+    else:
+      # wholeRst = Bin(bor,
+      #                ~rst,
+      #                ~wholeRst)
+      lexermakerBody.add(
+        newAssignment(
+          newIdentNode("wholeRst"),
+          newCall(
+            newIdentNode("Bin"),
+            newIdentNode("bor"),
+            nnkPrefix.newTree(
+              newIdentNode("~"),
+              newIdentNode("rst")
+            ),
+            nnkPrefix.newTree(
+              newIdentNode("~"),
+              newIdentNode("wholeRst")
+            )
+          )
+        )
+      )
+    # acc = accPos(rst)
+    lexerMakerBody.add(
+      nnkStmtList.newTree(
+        nnkAsgn.newTree(
+          newIdentNode("acc"),
+          nnkCall.newTree(
+            newIdentNode("accPos"),
+            newIdentNode("rst")
+          )
+        )
+      )
+    )
+    # for a in acc:
+    #   app[a] = (meta procName)
+    lexerMakerBody.add(
+      nnkStmtList.newTree(
+        nnkForStmt.newTree(
+          newIdentNode("a"),
+          newIdentNode("acc"),
+          nnkStmtList.newTree(
+            nnkCall.newTree(
+              nnkAccQuoted.newTree(
+                newIdentNode("[]=")
+              ),
+              newIdentNode("app"),
+              newIdentNode("a"),
+              procName
+            )
+          )
+        )
+      )
+    )
+  result.add(procs)
+  # let lr = LexRe[(meta typeIdent)](st: wholeRst, accPosProc: app)
+  lexerMakerBody.add(
+    nnkLetSection.newTree(
+      nnkIdentDefs.newTree(
+        newIdentNode("lr"),
+        newEmptyNode(),
+        nnkObjConstr.newTree(
+          nnkBracketExpr.newTree(
+            newIdentNode("LexRe"),
+            newIdentNode(typeIdent)
+          ),
+          nnkExprColonExpr.newTree(
+            newIdentNode("st"),
+            newIdentNode("wholeRst")
+          ),
+          nnkExprColonExpr.newTree(
+            newIdentNode("accPosProc"),
+            newIdentNode("app")
+          )
+        )
+      )
+    )
+  )
+  # let dfa = makeDFA[(meta typeIdent)](lr)
+  lexerMakerBody.add(
+    nnkLetSection.newTree(
+      nnkIdentDefs.newTree(
+        newIdentNode("dfa"),
+        newEmptyNode(),
+        nnkCall.newTree(
+          nnkBracketExpr.newTree(
+            newIdentNode("makeDFA"),
+            newIdentNode(typeIdent)
+          ),
+          newIdentNode("lr")
+        )
+      )
+    )
+  )
+  # let minimizedDfa = minimizeStates(dfa)
+  lexerMakerBody.add(
+    nnkStmtList.newTree(
+      nnkLetSection.newTree(
+        nnkIdentDefs.newTree(
+          newIdentNode("minimizedDfa"),
+          newEmptyNode(),
+          nnkCall.newTree(
+            newIdentNode("minimizeStates"),
+            newIdentNode("dfa")
+          )
+        )
+      )
+    )
+  )
+  # result = convertToLexData(dfa)
+  lexerMakerBody.add(
+    nnkStmtList.newTree(
+      nnkAsgn.newTree(
+        newIdentNode("result"),
+        nnkCall.newTree(
+          newIdentNode("convertToLexData"),
+          newIdentNode("minimizedDfa")
+        )
+      )
+    )
+  )
+  # proc ...Maker(): LexData[(meta typeIdent)] =
+  #   (meta lexerMakerBody)
+  result.add(
+    newProc(
+      name = newIdentNode(nameStr & "Maker"),
+      params = @[
+        nnkBracketExpr.newTree(newIdentNode("LexData"),
+                               newIdentNode(typeIdent))
+      ],
+      body = lexerMakerBody
+    )
+  )
+  # const (meta nameStr) = ...Maker()
+  result.add(
+    nnkStmtList.newTree(
+      nnkConstSection.newTree(
+        nnkConstDef.newTree(
+          newIdentNode(nameStr),
+          newEmptyNode(),
+          nnkCall.newTree(
+            newIdentNode(nameStr & "Maker")
+          )
+        )
+      )
+    )
+  )
