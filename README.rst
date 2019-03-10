@@ -14,7 +14,9 @@ Example is as follows.
 
 .. code-block:: nim
 
-  niml myLexer:
+  ## This makes a LexData object named myLexer.
+  ## This lexer returns value with type ``Token`` when a token is found.
+  niml myLexer[Token]:
     r"if":
       ## this part converted to procbody.
       ## the arg is (token: LToken).
@@ -28,8 +30,6 @@ Example is as follows.
     ## you can use ``..`` instead of ``-`` in ``[]``.
     r"[a..zA..Z-_][a..zA..Z0..9\-_]*":
       return TokenIdentifier(token)
-
-This makes a LexData object named myLexer.
 
 Meta charactors are as following:
 
