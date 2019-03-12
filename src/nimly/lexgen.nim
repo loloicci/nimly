@@ -595,6 +595,11 @@ proc nextState*[T](ld: LexData[T], s: State, a: char): State =
       else:
         return default
 
+proc isAcc*[T](ld: LexData[T], s: State): bool =
+  if s < 0 or ld.dba.len <= s:
+    return false
+  return ld.dba[s].accept.kind == AcceptKind.Acc
+
 variant RePart:
   RChar(c: char)
   Special(sc: char)
