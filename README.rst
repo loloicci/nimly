@@ -59,3 +59,45 @@ Each of followings is recognized as character set.
 - ``\S``: ``[^ \t\n\r\f\v]``
 - ``\w``: ``[a..zA..Z0..9_]``
 - ``\w``: ``[^a..zA..Z0..9_]``
+
+
+usage
+-----
+...
+
+nimy
+====
+niml is a lalr1 parser generator work in Nim-lang.
+
+macro nimy
+----------
+macro nimy makes a parser.
+Example is as follows.
+
+.. code-block:: nim
+
+  ## This makes a LexData object named myParser.
+  ## first cloud is the top-level of the BNF.
+  ## This lexer recieve tokens with type ``Token`` and token must have a value
+  ## ``kind`` with type enum ``[TokenTypeName]Kind``.
+  ## This is naturally satisfied when you use ``patty`` to define the token.
+  nimy myParser[Token]:
+    ## the starting non-terminal
+    ## the return type of the parser is ``Expr``
+    top[Expr]:
+      ## a pattern.
+      expr:
+        ## proc body that is used when parse the pattern with single ``expr``.
+        ## $1 means first position of the pattern (expr)
+        return $1
+    ## non-terminal named ``expr``
+    ## with returning type ``Expr``
+    expr[Expr]:
+      ## first pattern of expr.
+      ## ``LPAR`` and ``RPAR`` is TokenKind.
+      LPAR expr RPAR:
+        return $2
+      ## second pattern of expr.
+      ## ``PLUS`` is TokenKind.
+      expr PLUS expr
+        return $2
