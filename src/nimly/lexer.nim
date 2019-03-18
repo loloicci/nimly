@@ -7,6 +7,7 @@ import lexgen
 type
   NimlLexer[T] = object of BaseLexer
     data: LexData[T]
+  EOFError* = object of Exception
 
 proc open*[T](data: LexData[T], path: string): NimlLexer[T] =
   result = NimlLexer[T](data: data)
@@ -53,6 +54,13 @@ proc lex*[T](nl: var NimlLexer[T]): T =
   result = nl.data.dba[lastAccState].accept.fun(ltoken)
 
   nl.bufpos = lastAccPos
+
+proc lexNext*[T](nl: var NimlLexer[T], ignoreIf: proc(r: T): bool): T =
+  while nl.buf[nl.bufpos] != EndOfFile:
+    let result = nl.lex
+    if not ignoreIf(result):
+      return
+  raise newException(EOFError)
 
 iterator lexIter*[T](nl: var NimlLexer[T], ignoreIf: proc(r: T): bool): T =
   while nl.buf[nl.bufpos] != EndOfFile:
