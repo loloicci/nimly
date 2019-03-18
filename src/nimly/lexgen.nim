@@ -957,7 +957,7 @@ macro nimly*(name, body: untyped): untyped =
                       newIdentNode("LToken"),
                       newEmptyNode())
     let
-      procName = newIdentNode("procForCloud" & nameStr & $i)
+      procName = genSym(nskProc)
       procNode = newProc(
         name = procName,
         params = @[newIdentNode(typeIdent), param],
@@ -1105,9 +1105,10 @@ macro nimly*(name, body: untyped): untyped =
   )
   # proc ...Maker(): LexData[(meta typeIdent)] =
   #   (meta lexerMakerBody)
+  let makerName = genSym(nskProc)
   result.add(
     newProc(
-      name = newIdentNode(nameStr & "Maker"),
+      name = makerName,
       params = @[
         nnkBracketExpr.newTree(newIdentNode("LexData"),
                                newIdentNode(typeIdent))
@@ -1123,7 +1124,7 @@ macro nimly*(name, body: untyped): untyped =
           newIdentNode(nameStr),
           newEmptyNode(),
           nnkCall.newTree(
-            newIdentNode(nameStr & "Maker")
+            makerName
           )
         )
       )
