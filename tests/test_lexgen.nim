@@ -248,6 +248,7 @@ test "test macro nimly (if)":
 
 test "test macro nimly (if)":
   nimly testLex[string]:
+    ## comment
     r"if":
       return token.token
     r"else":

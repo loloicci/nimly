@@ -947,6 +947,8 @@ macro nimly*(name, body: untyped): untyped =
   if body.len < 1:
     error "no cloud"
   for i, cloud in body:
+    if cloud.kind == nnkCommentStmt:
+      continue
     cloud.expectKind(nnkCall)
     cloud[0].expectKind({nnkRStrLit, nnkStrLit})
     cloud[1].expectKind(nnkStmtList)
