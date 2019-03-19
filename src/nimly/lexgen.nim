@@ -875,7 +875,7 @@ proc convertToReSynTree*(re: string, nextPos: var int): ReSynTree =
 export tables
 export sets
 
-macro nimly*(name, body: untyped): untyped =
+macro niml*(name, body: untyped): untyped =
   name.expectKind(nnkBracketExpr)
   body.expectKind(nnkStmtList)
   let

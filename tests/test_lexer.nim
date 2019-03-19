@@ -24,7 +24,7 @@ proc accProc[T](ld: LexData[T], str: string): AccProc[T] =
   return ld.dba[fs].accept.fun
 
 test "test macro nimly (if/else)":
-  nimly testLex[string]:
+  niml testLex[string]:
     r"if":
       return token.token
     r"else":

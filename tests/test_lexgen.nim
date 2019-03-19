@@ -236,8 +236,8 @@ test "test convertToSynTree (.*)":
   check dfa.doesAccept("")
   check dfa.doesAccept("()*")
 
-test "test macro nimly (if)":
-  nimly testLex[string]:
+test "test macro niml (if)":
+  niml testLex[string]:
     r"if":
       return "acc"
   check testLex.doesAccept("if")
@@ -246,8 +246,8 @@ test "test macro nimly (if)":
   check (not testLex.doesAccept("else"))
   check (not testLex.doesAccept("iff"))
 
-test "test macro nimly (if)":
-  nimly testLex[string]:
+test "test macro niml (if)":
+  niml testLex[string]:
     ## comment
     r"if":
       return token.token
