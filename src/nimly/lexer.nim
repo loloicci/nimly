@@ -5,8 +5,9 @@ import lextypes
 import lexgen
 
 type
-  NimlLexer[T] = object of BaseLexer
-    data: LexData[T]
+  NimlLexer*[T] = object of BaseLexer
+    data*: LexData[T]
+    ignoreIf*: proc(r: T): bool
   EOFError* = object of Exception
 
 proc open*[T](data: LexData[T], path: string): NimlLexer[T] =
@@ -55,15 +56,13 @@ proc lex*[T](nl: var NimlLexer[T]): T =
 
   nl.bufpos = lastAccPos
 
-proc lexNext*[T](nl: var NimlLexer[T], ignoreIf: proc(r: T): bool): T =
+proc lexNext*[T](nl: var NimlLexer[T]): T =
   while nl.buf[nl.bufpos] != EndOfFile:
-    let result = nl.lex
-    if not ignoreIf(result):
+    result = nl.lex
+    if not nl.ignoreIf(result):
       return
-  raise newException(EOFError)
+  raise newException(EOFError, "read EOF")
 
-iterator lexIter*[T](nl: var NimlLexer[T], ignoreIf: proc(r: T): bool): T =
+iterator lexIter*[T](nl: var NimlLexer[T]): T =
   while nl.buf[nl.bufpos] != EndOfFile:
-    let ret = nl.lex
-    if not ignoreIf(ret):
-      yield ret
+    yield nl.lexNext
