@@ -1132,3 +1132,5 @@ macro nimly*(name, body: untyped): untyped =
       )
     )
   )
+  when defined(nimlydebug):
+    echo toStrLit(result)
