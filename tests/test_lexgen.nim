@@ -246,7 +246,7 @@ test "test macro niml (if)":
   check (not testLex.doesAccept("else"))
   check (not testLex.doesAccept("iff"))
 
-test "test macro niml (if)":
+test "test macro niml (if/else)":
   niml testLex[string]:
     ## comment
     r"if":
@@ -259,3 +259,13 @@ test "test macro niml (if)":
   check testLex.doesAccept("else")
   check testLex.accProc("else")(LToken(token: "else")) == "acc"
   check (not testLex.doesAccept("iff"))
+
+test "test macro niml ([\\w]*)":
+  ## to check calc in compile time
+  niml testLex[string]:
+    r"[\w]*":
+      return token.token
+  check testLex.doesAccept("if")
+  check testLex.accProc("if")(LToken(token: "if")) == "if"
+  check testLex.doesAccept("else")
+  check testLex.accProc("else")(LToken(token: "else")) == "else"
