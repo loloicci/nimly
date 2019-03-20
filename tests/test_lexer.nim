@@ -34,15 +34,17 @@ test "test macro nimly (if/else)":
   var testLexer = testLex.newWithString("""if
 else if
 else""")
+  testLexer.ignoreIf = proc(r: string): bool = false
   var ret: seq[string] = @[]
-  for s in testLexer.lexIter(proc(r: string): bool = false):
+  for s in testLexer.lexIter():
     ret.add(s)
   check ret == @["if", "", "acc", "", "if", "", "acc"]
 
   testLexer = testLex.newWithString("""if
 else if
 else""")
+  testLexer.ignoreIf = proc(r: string): bool = r == ""
   ret = @[]
-  for s in testLexer.lexIter(proc(r: string): bool = r == ""):
+  for s in testLexer.lexIter:
     ret.add(s)
   check ret == @["if", "acc", "if", "acc"]

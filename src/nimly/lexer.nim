@@ -5,9 +5,10 @@ import lextypes
 import lexgen
 
 type
-  NimlLexer[T] = object of BaseLexer
-    data: LexData[T]
-  EOFError* = object of Exception
+  NimlLexer*[T] = object of BaseLexer
+    data*: LexData[T]
+    ignoreIf*: proc(r: T): bool
+  NimlEOFError* = object of Exception
 
 proc open*[T](data: LexData[T], path: string): NimlLexer[T] =
   result = NimlLexer[T](data: data)
@@ -16,6 +17,12 @@ proc open*[T](data: LexData[T], path: string): NimlLexer[T] =
 proc newWithString*[T](data: LexData[T], str: string): NimlLexer[T] =
   result = NimlLexer[T](data: data)
   result.open(newStringStream(str))
+
+proc open*[T](lexer: var NimlLexer[T], path: string) =
+  lexer.open(openFileStream(path))
+
+proc initWithString*[T](lexer: var NimlLexer[T], str: string) =
+  lexer.open(newStringStream(str))
 
 proc lex*[T](nl: var NimlLexer[T]): T =
   let
@@ -55,15 +62,13 @@ proc lex*[T](nl: var NimlLexer[T]): T =
 
   nl.bufpos = lastAccPos
 
-proc lexNext*[T](nl: var NimlLexer[T], ignoreIf: proc(r: T): bool): T =
+proc lexNext*[T](nl: var NimlLexer[T]): T =
   while nl.buf[nl.bufpos] != EndOfFile:
-    let result = nl.lex
-    if not ignoreIf(result):
+    result = nl.lex
+    if not nl.ignoreIf(result):
       return
-  raise newException(EOFError)
+  raise newException(NimlEOFError, "read EOF")
 
-iterator lexIter*[T](nl: var NimlLexer[T], ignoreIf: proc(r: T): bool): T =
+iterator lexIter*[T](nl: var NimlLexer[T]): T =
   while nl.buf[nl.bufpos] != EndOfFile:
-    let ret = nl.lex
-    if not ignoreIf(ret):
-      yield ret
+    yield nl.lexNext

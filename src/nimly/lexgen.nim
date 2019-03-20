@@ -1132,5 +1132,5 @@ macro niml*(name, body: untyped): untyped =
       )
     )
   )
-  when defined(nimlydebug):
-    echo toStrLit(result)
+  when defined(nimldebug):
+    echo treeRepr(result)
