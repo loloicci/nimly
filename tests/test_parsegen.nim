@@ -43,25 +43,19 @@ niml testLex[MyToken]:
 nimy testPar[MyToken]:
   top[string]:
     plus:
-      echo "top"
       return $1
   plus[string]:
     plus PLUS plus:
-      echo "PLUS 1"
       return $1 & " + " & $3
     mult:
-      echo "PLUS 2"
       return $1
   mult[string]:
     mult MULTI mult:
-      echo "MULT 1"
       return "(" & $1 & " * " & $3 & ")"
     num:
-      echo "MULT 2"
       return $1
   num[string]:
     NUM:
-      echo "NUM"
       return $(($1).val)
 
 test "test 1":

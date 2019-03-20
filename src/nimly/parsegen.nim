@@ -37,17 +37,15 @@ proc genKindNode(kindTy, kind: NimNode): NimNode =
     kind
   )
 
-proc convertToSymNode(node, kindTy: NimNode,
+proc convertToSymNode(name: string, kindTy: NimNode,
                       nonTerms: HashSet[string]): NimNode =
-  node.expectKind(nnkIdent)
-  let sym = $(node.ident)
-  if sym in nonTerms:
+  if name in nonTerms:
     result = nnkCall.newTree(
       nnkBracketExpr.newTree(
         newIdentNode("NonTermS"),
         kindTy
       ),
-      newStrLitNode(sym)
+      newStrLitNode(name)
     )
   else:
     result = nnkCall.newTree(
@@ -55,8 +53,14 @@ proc convertToSymNode(node, kindTy: NimNode,
         newIdentNode("TermS"),
         kindTy
       ),
-      genKindNode(kindTy, node)
+      genKindNode(kindTy, newIdentNode(name))
     )
+
+proc convertToSymNode(node, kindTy: NimNode,
+                      nonTerms: HashSet[string]): NimNode =
+  node.expectKind(nnkIdent)
+  let name = $(node.ident)
+  return convertToSymNode(name, kindTy, nonTerms)
 
 proc newRuleMakerNode(kindTy, left: NimNode,
                       right: varargs[NimNode]): NimNode =
@@ -86,7 +90,8 @@ proc nonTermOrEmpty(node: NimNode, nonTerms: HashSet[string]): string =
     result = ""
 
 proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
-                      nonTerms: HashSet[string], nimyInfo: NimyInfo): (
+                      nonTerms: HashSet[string], terms: var HashSet[string],
+                      nimyInfo: NimyInfo): (
                         NimNode, seq[string], NimNode) =
   node.expectKind({nnkCall, nnkCommand})
   var types: seq[string] = @[]
@@ -95,6 +100,8 @@ proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
     let
       rightNode = node[0].convertToSymNode(kindTy, nonTerms)
       ruleMaker = newRuleMakerNode(kindTy, left, rightNode)
+    if not ($(node[0].ident) in nonTerms):
+      terms.incl($(node[0].ident))
     # types.add(getTypeNode(node[0], nonTerms, nimyInfo))
     types.add(node[0].nonTermOrEmpty(nonTerms))
     result = (ruleMaker, types, node[1])
@@ -103,10 +110,14 @@ proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
       right: seq[NimNode] = @[]
       cmd: NimNode = node
     while cmd.kind == nnkCommand:
+      if not ($(cmd[0].ident) in nonTerms):
+        terms.incl($(cmd[0].ident))
       right.add(cmd[0].convertToSymNode(kindTy, nonTerms))
       # types.add(cmd[0].getTypeNode(nonTerms, nimyInfo))
       types.add(cmd[0].nonTermOrEmpty(nonTerms))
       cmd = cmd[1]
+    if not ($(cmd.ident) in nonTerms):
+      terms.incl($(cmd.ident))
     right.add(cmd.convertToSymNode(kindTy, nonTerms))
     # types.add(cmd.getTypeNode(nonTerms, nimyInfo))
     types.add(cmd.nonTermOrEmpty(nonTerms))
@@ -198,8 +209,124 @@ proc makeRuleProc(name, body, rTy, tokenType, tokenKind: NimNode,
   else:
     result = newProc(name, params)
 
+proc addVarSymToInt(stm : var NimNode,
+                    id, tokenKind: NimNode, syms: seq[NimNode]) =
+  stm.expectKind(nnkStmtList)
+  stm.add(
+    newVarStmt(
+      id,
+      nnkCall.newTree(
+        nnkBracketExpr.newTree(
+          newIdentNode("initTable"),
+          nnkBracketExpr.newTree(
+            newIdentNode("Symbol"),
+            tokenKind
+          ),
+          newIdentNode("int")
+        )
+      )
+    )
+  )
+  for i, sym in syms:
+    stm.add(
+      nnkAsgn.newTree(
+        nnkBracketExpr.newTree(
+          id,
+          sym
+        ),
+        newIntLitNode(i)
+      )
+    )
+
+proc addRuleToInt(stm : var NimNode,
+                  id, tokenKind: NimNode, rules: seq[NimNode]) =
+  stm.expectKind(nnkStmtList)
+  stm.add(
+    newVarStmt(
+      id,
+      nnkCall.newTree(
+        nnkBracketExpr.newTree(
+          newIdentNode("initTable"),
+          nnkBracketExpr.newTree(
+            newIdentNode("Rule"),
+            tokenKind
+          ),
+          newIdentNode("int")
+        )
+      )
+    )
+  )
+  for i, r in rules:
+    stm.add(
+      nnkAsgn.newTree(
+        nnkBracketExpr.newTree(
+          id,
+          r
+        ),
+        newIntLitNode(- (i + 1))
+      )
+    )
+
+proc addIntToRule(stm : var NimNode,
+                  id, tokenKind: NimNode, rules: seq[NimNode]) =
+  stm.expectKind(nnkStmtList)
+  stm.add(
+    newVarStmt(
+      id,
+      nnkCall.newTree(
+        nnkBracketExpr.newTree(
+          newIdentNode("initTable"),
+          newIdentNode("int"),
+          nnkBracketExpr.newTree(
+            newIdentNode("Rule"),
+            tokenKind
+          )
+        )
+      )
+    )
+  )
+  for i, r in rules:
+    stm.add(
+      nnkAsgn.newTree(
+        nnkBracketExpr.newTree(
+          id,
+        newIntLitNode(- (i + 1))
+        ),
+        r
+      )
+    )
+
+proc addVarIntToSym(stm : var NimNode,
+                    id, tokenKind: NimNode, syms: seq[NimNode]) =
+  stm.expectKind(nnkStmtList)
+  stm.add(
+    newVarStmt(
+      id,
+      nnkCall.newTree(
+        nnkBracketExpr.newTree(
+          newIdentNode("initTable"),
+          newIdentNode("int"),
+          nnkBracketExpr.newTree(
+            newIdentNode("Symbol"),
+            tokenKind
+          )
+        )
+      )
+    )
+  )
+  for i, sym in syms:
+    stm.add(
+      nnkAsgn.newTree(
+        nnkBracketExpr.newTree(
+          id,
+          newIntLitNode(i)
+        ),
+        sym
+      )
+    )
+
 proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
-                    rules, ruleDefs: seq[NimNode]): NimNode =
+                    rules, ruleDefs, syms: seq[NimNode]): NimNode =
   var body = nnkStmtList.newTree()
   for rd in ruleDefs:
     body.add(rd)
@@ -210,14 +337,16 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
     nnkVarSection.newTree(
       nnkIdentDefs.newTree(
         setId,
-        newEmptyNode(),
-        nnkCall.newTree(
+        nnkBracketExpr.newTree(
+          newIdentNode("seq"),
           nnkBracketExpr.newTree(
-            newIdentNode("initSet"),
-            nnkBracketExpr.newTree(
-              newIdentNode("Rule"),
-              tokenKind
-            )
+            newIdentNode("Rule"),
+            tokenKind
+          )
+        ),
+        nnkPrefix.newTree(
+          newIdentNode("@"),
+          nnkBracket.newTree(
           )
         )
       )
@@ -228,7 +357,7 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
       nnkCall.newTree(
         nnkDotExpr.newTree(
           setId,
-          newIdentNode("incl")
+          newIdentNode("add")
         ),
         rule
       )
@@ -243,9 +372,10 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
       )
     )
   )
+  let tmpTable = genSym()
   body.add(
-    nnkAsgn.newTree(
-      newIdentNode("result"),
+    newLetStmt(
+      tmpTable,
       nnkCall.newTree(
         nnkBracketExpr.newTree(
           newIdentNode("makeTable"),
@@ -255,12 +385,27 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
       )
     )
   )
+  let stiId = genSym(nskVar)
+  body.addVarSymToInt(stiId, tokenKind, syms)
+  let rtiId = genSym(nskVar)
+  body.addRuleToInt(rtiId, tokenKind, rules)
+  body.add(
+    nnkAsgn.newTree(
+      newIdentNode("result"),
+      nnkCall.newTree(
+        nnkBracketExpr.newTree(
+          newIdentNode("toConst"),
+          tokenKind
+        ),
+        tmpTable,
+        stiId,
+        rtiId
+      )
+    )
+  )
   result = newProc(
     name,
-    @[nnkBracketExpr.newTree(
-      newIdentNode("ParsingTable"),
-      tokenKind
-    )],
+    @[newIdentNode("ConstTable")],
     body
   )
 
@@ -274,6 +419,7 @@ macro nimy*(head, body: untyped): untyped =
   var
     nimyInfo = initNimyInfo()
     nonTerms = initSet[string]()
+    terms = initSet[string]()
     first = true
     topNonTermNode: NimNode
     topProcId: NimNode
@@ -284,6 +430,7 @@ macro nimy*(head, body: untyped): untyped =
     ruleToProcMakers: seq[NimNode] = @[]
     tableConstDefs: seq[NimNode] = @[]
     ruleProcPts: seq[NimNode] = @[]
+    symNodes: seq[NimNode] = @[]
   result = newTree(nnkStmtList)
 
   # read BNF first (collert info)
@@ -332,7 +479,7 @@ macro nimy*(head, body: untyped): untyped =
         # argTypes: seq[bool] (true if nonterm)
         (ruleMaker, argTypes, clauseBody) = parseRuleAndBody(
           ruleClause, tokenKind, tokenType, left,
-          nonTerms, nimyInfo
+          nonTerms, terms, nimyInfo
         )
         ruleId = genSym()
         ruleProcId = genSym(nskProc)
@@ -401,34 +548,68 @@ macro nimy*(head, body: untyped): untyped =
   result.add(tableConstDefs)
   result.add(ruleProcs)
   # makeGrammarAndParsingTable
+  for nt in nonTerms + terms:
+    symNodes.add(convertToSymNode(nt, tokenKind, nonTerms))
+  symNodes.add(
+    newCall(
+      nnkBracketExpr.newTree(
+        newIdentNode("Nil"),
+        tokenKind
+      )
+    )
+  )
   let
     tmpName = genSym(nskProc)
   var
     tableName: NimNode
   result.add(
     tableMakerProc(tmpName, tokenType, tokenKind, topNonTermNode, ruleIds,
-                   ruleDefs)
+                   ruleDefs, symNodes)
   )
-  when defined(nimydebug):
-    tableName = genSym()
+  var constTableName: NimNode
+  when defined(nimylet):
+    constTableName = genSym()
     result.add(
       newLetStmt(
-        tableName,
+        constTableName,
         nnkCall.newTree(
           tmpName
         )
       )
     )
   else:
-    tableName = genSym(nskConst)
+    constTableName = genSym(nskConst)
     result.add(
       newConstStmt(
-        tableName,
+        constTableName,
         nnkCall.newTree(
           tmpName
         )
       )
     )
+
+  let
+    its = genSym(nskVar)
+    itr = genSym(nskVar)
+    letTable = newIdentNode("letTable") #genSym()
+
+  result.add(ruleDefs)
+  result.addVarIntToSym(its, tokenKind, symNodes)
+  result.addIntToRule(itr, tokenKind, ruleIds)
+  result.add(
+    newLetStmt(
+      letTable,
+      newCall(
+        nnkBracketExpr.newTree(
+          newIdentNode("reconstruct"),
+          tokenKind
+        ),
+        constTableName,
+        its,
+        itr
+      )
+    )
+  )
 
   result.add(
     newVarStmt(
@@ -438,7 +619,7 @@ macro nimy*(head, body: untyped): untyped =
           newIdentNode("newParser"),
           tokenKind
         ),
-        tableName
+        letTable
       )
     )
   )

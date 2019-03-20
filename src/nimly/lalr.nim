@@ -150,16 +150,91 @@ type
   ParsingTable*[T] = object
     action*: ActionTable[T]
     goto*: GotoTable[T]
-  ConstActionTable[T] = seq[seq[ActionTableItem[T]]]
-  ConstGotoTable = seq[seq[int]]
+  ConstActionTable* = seq[seq[int]]
+  ConstGotoTable* = seq[seq[int]]
+  ConstTable* = (ConstActionTable, ConstGotoTable)
   SymbolToInt*[T] = Table[Symbol[T], int]
+  RuleToInt*[T] = Table[Rule[T], int]
   Parser*[T] = object
     stack: seq[State]
     table*: ParsingTable[T]
+  IntToSym*[T] = Table[int, Symbol[T]]
+  IntToRule*[T] = Table[int, Rule[T]]
 
 variantp ParseTree[T, S]:
   Terminal(token: T)
   NonTerminal(rule: Rule[S], tree: seq[ParseTree[T, S]])
+
+proc inst[T](sq: var seq[T], item: T, default: T, index: int) =
+  for i in 0..(index - sq.len):
+    sq.add(default)
+  sq[index] = item
+
+proc toConst*[T](pt: ParsingTable[T],
+                 sti: SymbolToInt[T],
+                 rti: RuleToInt[T]): ConstTable =
+  var
+    cat: seq[seq[int]] = @[]
+    cgt: seq[seq[int]] = @[]
+  for state, ar in pt.action:
+    var row: seq[int] = @[]
+    for sym, ati in ar:
+      let idx = sti[sym]
+      var item: int
+      case ati.kind
+      of ActionTableItemKind.Shift:
+        let s = ati.state
+        item = s
+      of ActionTableItemKind.Reset:
+        let r = ati.rule
+        item = rti[r]
+      of ActionTableItemKind.Accept:
+        item = high(int)
+      else:
+        doAssert false
+      row.inst(item, low(int), idx)
+    let default: seq[int] = @[]
+    cat.inst(row, default, state)
+
+  for state, gr in pt.goto:
+    var row: seq[int] = @[]
+    for sym, st in gr:
+      let idx = sti[sym]
+      row.inst(st, low(int), idx)
+    let default: seq[int] = @[]
+    cgt.inst(row, default, state)
+
+  result = (cat, cgt)
+
+proc reconstruct*[T](cpt: ConstTable,
+                     its: IntToSym[T],
+                     itr: IntToRule[T]): ParsingTable[T] =
+  let (cat, cgt) = cpt
+  var
+    rat = initTable[State, ActionRow[T]]()
+    rgt = initTable[State, GotoRow[T]]()
+  for rid, row in cat:
+    if row.len == 0:
+      continue
+    var trow = initTable[Symbol[T], ActionTableItem[T]]()
+    for id, ati in row:
+      if ati == high(int):
+        trow[its[id]] = Accept[T]()
+      elif ati < 0 and ati != low(int):
+        trow[its[id]] = Reset[T](itr[ati])
+      elif ati > 0:
+        trow[its[id]] = Shift[T](ati)
+    rat[rid] = trow
+  for rid, row in cgt:
+    if row.len == 0:
+      continue
+    var trow = initTable[Symbol[T], State]()
+    for id, st in row:
+      if st == low(int):
+        continue
+      trow[its[id]] = st
+    rgt[rid] = trow
+  result = ParsingTable[T](action: rat, goto: rgt)
 
 proc `$`*[T, S](pt: ParseTree[T, S], indent: int = 0): string =
   match pt:
@@ -436,14 +511,21 @@ proc makeFollowTable[T](g: Grammar[T]): FollowTable[T] =
             firstSyms = [sym].toSet
           NonTermS:
             # renew first table
-            let fsts = g.firstTable[sym]
-            fCnt = (not result[sym].containsOrIncl(firstSyms)) or fCnt
+            for f in firstSyms:
+              let prevFC = fCnt
+              fCnt = (not result[sym].containsOrIncl(f))
+              fCnt = fCnt or prevFC
             if fEmpTail:
-              fCnt = (not result[sym].containsOrincl(result[r.left])) or fCnt
+              for f in result[r.left]:
+                let prevFC = fCnt
+                fCnt = (not result[sym].containsOrincl(f))
+                fCnt = fCnt or prevFC
 
             # renew meta data
+            let fsts = g.firstTable[sym]
             if fsts.contains(Empty[T]()):
-              firstSyms.incl(fsts)
+              for f in fsts:
+                firstSyms.incl(f)
             else:
               fEmpTail = false
               firstSyms = fsts
