@@ -363,11 +363,6 @@ proc next[T](i: LALRItem[T]): Symbol[T] =
     return Nil[T]()
   result = i.rule.right[i.pos]
 
-proc prev[T](i: LALRItem[T]): Symbol[T] =
-  if i.pos == 0:
-    return Nil[T]()
-  result = i.rule.right[i.pos - 1]
-
 proc pointForward[T](i: LALRItem[T]): LALRItem[T] =
   doAssert i.pos < i.rule.len
   result = LALRItem[T](rule: i.rule, pos: i.pos + 1)
@@ -425,14 +420,6 @@ proc symbolSet[T](g: Grammar[T]): HashSet[Symbol[T]] =
   for r in g.rules:
     for s in r.right:
       result.incl(s)
-  result.incl(g.start)
-
-proc termSymbolSet[T](g: Grammar[T]): HashSet[Symbol[T]] =
-  result.init()
-  for r in g.rules:
-    for s in r.right:
-      if s.kind == SymbolKind.TermS:
-        result.incl(s)
   result.incl(g.start)
 
 proc nonTermSymbolSet[T](g: Grammar[T]): HashSet[Symbol[T]] =
