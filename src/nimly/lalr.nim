@@ -150,6 +150,9 @@ type
   ParsingTable*[T] = object
     action*: ActionTable[T]
     goto*: GotoTable[T]
+  ConstActionTable[T] = seq[seq[ActionTableItem[T]]]
+  ConstGotoTable = seq[seq[int]]
+  SymbolToInt*[T] = Table[Symbol[T], int]
   Parser*[T] = object
     stack: seq[State]
     table*: ParsingTable[T]

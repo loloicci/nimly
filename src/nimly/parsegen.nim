@@ -6,25 +6,14 @@ import patty
 
 import lalr
 
-#[
-proc genSym(t: NimSymKind = nskUnknown): NimNode =
-  var id {.threadvar.}: string
-  id = id & "a"
-  result = newIdentNode(id)
-]#
-
 type
   PTProc[T, S, R] = proc(tree: ParseTree[T, S]): R {.nimcall.}
   RuleToProc*[T, S, R] = Table[Rule[S], PTProc[T, S, R]]
   # nontermStr -> (retTyNode, ruleToProc id, (clauseNo -> procName))
-  RuleInfo = Table[int, NimNode]
-  NimyInfo = Table[string, (NimNode, NimNode, RuleInfo)]
-
-proc initRuleInfo(): RuleInfo =
-  return initTable[int, NimNode]()
+  NimyInfo = Table[string, (NimNode, NimNode)]
 
 proc initNimyInfo(): NimyInfo =
-  return initTable[string, (NimNode, NimNode, RuleInfo)]()
+  return initTable[string, (NimNode, NimNode)]()
 
 proc initRuleToProc*[T, S, R](): RuleToProc[T, S, R] =
   return initTable[Rule[S], PTProc[T, S, R]]()
@@ -304,7 +293,7 @@ macro nimy*(head, body: untyped): untyped =
     let (nonTerm, rType) = parseLeft(clause)
     doAssert (not (nonTerm in nonTerms)), "some nonterm are duplicated"
     nonTerms.incl(nonTerm)
-    nimyInfo[nonTerm] = (rType, genSym(), initRuleInfo())
+    nimyInfo[nonTerm] = (rType, genSym())
     if first:
       topNonTermNode = nnkCall.newTree(
         nnkBracketExpr.newTree(
