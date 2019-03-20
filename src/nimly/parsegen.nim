@@ -74,14 +74,6 @@ proc newRuleMakerNode(kindTy, left: NimNode,
   for node in right:
     result.add(node)
 
-proc getTypeNode(n, tokenType: NimNode,
-                 nonTerms: HashSet[string], nimyInfo: NimyInfo): NimNode =
-  let sym = $(n.ident)
-  if sym in nonTerms:
-    result = nimyInfo[sym][0]
-  else:
-    result = tokenType
-
 proc nonTermOrEmpty(node: NimNode, nonTerms: HashSet[string]): string =
   let s = $(node.ident)
   if s in nonTerms:
