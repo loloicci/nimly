@@ -67,7 +67,8 @@ usage
 
 nimy
 ====
-niml is a lalr1 parser generator work in Nim-lang.
+niml is a lr(0) parser generator work in Nim-lang.
+lalr(1) version is under developing.
 
 macro nimy
 ----------
