@@ -60,11 +60,6 @@ Each of followings is recognized as character set.
 - ``\w``: ``[a..zA..Z0..9_]``
 - ``\w``: ``[^a..zA..Z0..9_]``
 
-
-usage
------
-...
-
 nimy
 ====
 niml is a lr(0) parser generator work in Nim-lang.
@@ -102,3 +97,7 @@ Example is as follows.
       ## ``PLUS`` is TokenKind.
       expr PLUS expr
         return $2
+
+example
+=======
+Look ``tests/test_nimly.nim``
