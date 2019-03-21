@@ -8,7 +8,8 @@ type
   NimlLexer*[T] = object of BaseLexer
     data*: LexData[T]
     ignoreIf*: proc(r: T): bool
-  NimlEOFError* = object of Exception
+  NimlError* = object of Exception
+  NimlEOFError* = object of NimlError
 
 proc open*[T](data: LexData[T], path: string): NimlLexer[T] =
   result = NimlLexer[T](data: data)

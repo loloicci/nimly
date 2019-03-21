@@ -10,6 +10,11 @@ import lextypes
 import lexer
 
 type
+  NimyError* = object of Exception
+  NimyActionError* = object of NimyError
+  NimyGotoError* = object of NimyError
+
+type
   sym* = string
 
 type
