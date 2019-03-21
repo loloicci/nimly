@@ -165,3 +165,17 @@ example
     testPar.initParser()
     check testPar.parse(testLexer) == "1 + (2 * 3)"
 
+Install
+=======
+1. Clone this repository
+2. ``nimble install``
+
+Now, you can use nimly with ``import nimly``.
+
+Contribute
+==========
+1. Fork this
+2. Create new branch
+3. Commit your change
+4. Push it to the branch
+5. Create new pull request
