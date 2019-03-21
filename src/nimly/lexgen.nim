@@ -333,9 +333,14 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
   # make accepts
   var accepts = newDAccepts[T]()
   for k in posS2DState.keys:
+    # the first acc position is expected acc
+    var mp = high(int)
     for p in k:
       if lr.accPosProc.haskey(p):
-        accepts[posS2DState[k]] = (lr.accPosProc[p])
+        if p < mp:
+          mp = p
+    if mp != high(int):
+      accepts[posS2DState[k]] = (lr.accPosProc[mp])
 
   # make DFA
   return DFA[T](start: iState, accepts: accepts,
@@ -432,7 +437,7 @@ proc minimizeStates[T](input: DFA[T],
   result = result.removeDead
 
 proc minimizeStates*[T](input: DFA[T]): DFA[T] =
-  ## needs all accepts correspond unique cloud
+  ## needs all accepts correspond unique clause
   var
     initPart: seq[HashSet[DState]] = @[]
     other = initSet[DState]()
@@ -445,6 +450,10 @@ proc minimizeStates*[T](input: DFA[T]): DFA[T] =
     other.excl(k)
     initPart.add(single)
   initPart.add(other)
+  when defined(nimldebug):
+    echo "initPart\n--------"
+    echo initPart
+    echo "--------"
 
   result = input.minimizeStates(initPart)
 
@@ -997,11 +1006,11 @@ macro niml*(name, body: untyped): untyped =
             newIdentNode("bor"),
             nnkPrefix.newTree(
               newIdentNode("~"),
-              newIdentNode("rst")
+              newIdentNode("wholeRst")
             ),
             nnkPrefix.newTree(
               newIdentNode("~"),
-              newIdentNode("wholeRst")
+              newIdentNode("rst")
             )
           )
         )
@@ -1079,20 +1088,34 @@ macro niml*(name, body: untyped): untyped =
     )
   )
   # let minimizedDfa = minimizeStates(dfa)
-  lexerMakerBody.add(
-    nnkStmtList.newTree(
-      nnkLetSection.newTree(
-        nnkIdentDefs.newTree(
-          newIdentNode("minimizedDfa"),
-          newEmptyNode(),
-          nnkCall.newTree(
-            newIdentNode("minimizeStates"),
+  when defined(nimlnonmin):
+    lexerMakerBody.add(
+      nnkStmtList.newTree(
+        nnkLetSection.newTree(
+          nnkIdentDefs.newTree(
+            newIdentNode("minimizedDfa"),
+            newEmptyNode(),
             newIdentNode("dfa")
           )
         )
       )
     )
-  )
+
+  else:
+    lexerMakerBody.add(
+      nnkStmtList.newTree(
+        nnkLetSection.newTree(
+          nnkIdentDefs.newTree(
+            newIdentNode("minimizedDfa"),
+            newEmptyNode(),
+            nnkCall.newTree(
+              newIdentNode("minimizeStates"),
+              newIdentNode("dfa")
+            )
+          )
+        )
+      )
+    )
   # result = convertToLexData(dfa)
   lexerMakerBody.add(
     nnkStmtList.newTree(
@@ -1123,7 +1146,10 @@ macro niml*(name, body: untyped): untyped =
     nnkStmtList.newTree(
       nnkConstSection.newTree(
         nnkConstDef.newTree(
-          newIdentNode(nameStr),
+          nnkPostfix.newTree(
+            newIdentNode("*"),
+            newIdentNode(nameStr)
+          ),
           newEmptyNode(),
           nnkCall.newTree(
             makerName
@@ -1133,4 +1159,4 @@ macro niml*(name, body: untyped): untyped =
     )
   )
   when defined(nimldebug):
-    echo treeRepr(result)
+    echo toStrLit(result)

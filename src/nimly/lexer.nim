@@ -37,6 +37,9 @@ proc lex*[T](nl: var NimlLexer[T]): T =
     pos = nl.bufpos
     lastAccPos: int = -1
     ltoken = LToken(colNum: colNum, lineNum: lineNum, lineInfo: lineInfo)
+  when defined(nimldebug):
+    echo "--lex start--"
+    echo state
   while state != deadState:
     let c = nl.buf[pos]
     token &= c
@@ -48,6 +51,9 @@ proc lex*[T](nl: var NimlLexer[T]): T =
     else:
       inc(pos)
     state = nl.data.nextState(state, c)
+    when defined(nimldebug):
+      echo "read:" & c
+      echo "state:" & $state
     if nl.data.isAcc(state):
       lastAccToken = token
       lastAccState = state
@@ -61,6 +67,13 @@ proc lex*[T](nl: var NimlLexer[T]): T =
   result = nl.data.dba[lastAccState].accept.fun(ltoken)
 
   nl.bufpos = lastAccPos
+  when defined(nimldebug):
+    echo "--lex end--"
+    echo "token:" & lastAccToken
+    try:
+      echo "result:" & $result
+    except:
+      discard
 
 proc lexNext*[T](nl: var NimlLexer[T]): T =
   while nl.buf[nl.bufpos] != EndOfFile:

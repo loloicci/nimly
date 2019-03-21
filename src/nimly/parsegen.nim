@@ -583,7 +583,7 @@ macro nimy*(head, body: untyped): untyped =
   let
     its = genSym(nskVar)
     itr = genSym(nskVar)
-    letTable = newIdentNode("letTable") #genSym()
+    letTable = genSym()
 
   result.add(ruleDefs)
   result.addVarIntToSym(its, tokenKind, symNodes)
@@ -605,7 +605,10 @@ macro nimy*(head, body: untyped): untyped =
 
   result.add(
     newVarStmt(
-      parserName,
+      nnkPostfix.newTree(
+        newIdentNode("*"),
+        parserName
+      ),
       nnkCall.newTree(
         nnkBracketExpr.newTree(
           newIdentNode("newParser"),
@@ -619,7 +622,10 @@ macro nimy*(head, body: untyped): untyped =
   # add proc parse
   result.add(
     nnkProcDef.newTree(
-      newIdentNode("parse"),
+      nnkPostfix.newTree(
+        newIdentNode("*"),
+        newIdentNode("parse")
+      ),
       newEmptyNode(),
       nnkGenericParams.newTree(
         nnkIdentDefs.newTree(

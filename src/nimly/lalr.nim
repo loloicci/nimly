@@ -76,6 +76,19 @@ type
   LALRItems[T] = HashSet[LALRItem[T]]
   SetOfLALRItems[T] = OrderedSet[LALRItems[T]]
 
+
+proc `$`*[T](ft: FollowTable[T]): string =
+  result = "FollowTable:\n--------\n"
+  for i, itms in ft:
+    result = result & $i & ":" & $itms & "\n"
+  result = result & "--------\n"
+
+proc `$`*[T](s: SetOfLALRItems[T]): string =
+  result = "CanonicalCollection:\n--------\n"
+  for i, itms in s:
+    result = result & $i & ":" & $itms & "\n"
+  result = result & "--------\n"
+
 proc hash*[T](x: Symbol[T]): Hash =
   var h: Hash = 0
   h = h !& hash(x.kind)
@@ -160,6 +173,18 @@ type
     table*: ParsingTable[T]
   IntToSym*[T] = Table[int, Symbol[T]]
   IntToRule*[T] = Table[int, Rule[T]]
+
+proc `$`*[T](at: ActionTable[T]): string =
+  result = "\nActionTable:\n--------\n"
+  for s, row in at:
+    result = result & $s & ":" & $row & "\n"
+  result = result & "--------\n"
+
+proc `$`*[T](gt: GotoTable[T]): string =
+  result = "\nGotoTable:\n--------\n"
+  for s, row in gt:
+    result = result & $s & ":" & $row & "\n"
+  result = result & "--------\n"
 
 variantp ParseTree[T, S]:
   Terminal(token: T)
@@ -280,8 +305,8 @@ proc parseImpl*[T, S](parser: var Parser[S],
   var symbol = TermS[S](token.kind)
   while true:
     when defined(nimydebug):
-      echo parser.stack
-      echo symbol
+      echo "parser stack:" & $parser.stack
+      echo "read token:" & $symbol
     let action = parser.table.action[parser.top][symbol]
     when defined(nimydebug):
       echo action
@@ -568,6 +593,10 @@ proc makeTable*[T](g: Grammar[T]): ParsingTable[T] =
         _:
           discard
   result = ParsingTable[T](action: actionTable, goto: gotoTable)
+  when defined(nimydebug):
+    echo ag.followTable
+    echo canonicalCollection
+    echo result
 
 proc newParser*[T](t: ParsingTable[T]): Parser[T] =
   result = Parser[T](stack: @[0], table: t)
