@@ -25,6 +25,8 @@ proc open*[T](lexer: var NimlLexer[T], path: string) =
 proc initWithString*[T](lexer: var NimlLexer[T], str: string) =
   lexer.open(newStringStream(str))
 
+export lexbase.close
+
 proc lex*[T](nl: var NimlLexer[T]): T =
   let
     colNum = nl.getColNumber(nl.bufpos)

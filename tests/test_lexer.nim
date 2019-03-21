@@ -49,3 +49,4 @@ else""")
   for s in testLexer.lexIter:
     ret.add(s)
   check ret == @["if", "acc", "if", "acc"]
+  testLexer.close
