@@ -312,7 +312,18 @@ proc parseImpl*[T, S](parser: var Parser[S],
     when defined(nimydebug):
       echo "parser stack:" & $parser.stack
       echo "read token:" & $symbol
-    let action = parser.table.action[parser.top][symbol]
+    var action: ActionTableItem[S]
+    try:
+      action = parser.table.action[parser.top][symbol]
+    except KeyError:
+      var msg: string = "Unexpected token" & $symbol & "is passed."
+      try:
+        msg = msg & "\ntoken: " & $token
+      except:
+        discard
+      raise newException(NimyActionError, msg)
+    except:
+      raise
     when defined(nimydebug):
       echo action
     case action.kind
@@ -325,7 +336,6 @@ proc parseImpl*[T, S](parser: var Parser[S],
       except NimlEOFError:
         symbol = Nil[S]()
       except:
-        echo "unexpected"
         raise
       parser.push(s)
     of ActionTableItemKind.Reset:
@@ -335,7 +345,13 @@ proc parseImpl*[T, S](parser: var Parser[S],
         discard parser.pop
         discard tree.pop
       tree.add(NonTerminal[T, S](r, reseted))
-      parser.push(parser.table.goto[parser.top][r.left])
+      try:
+        parser.push(parser.table.goto[parser.top][r.left])
+      except KeyError:
+        let msg = "Nimy Internal Error (goto key error)"
+        raise newException(NimyGotoError, msg)
+      except:
+        raise
     of ActionTableItemKind.Accept:
       when defined(nimydebug):
         if tree.len == 1:
