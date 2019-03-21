@@ -21,7 +21,6 @@ type
   SymbolKind {.pure.} = enum
     TermS
     NonTermS
-    End
     Nil
     Empty
 
@@ -50,9 +49,6 @@ proc NonTermS*[T](nonTerm: sym): Symbol[T] =
 
 proc Nil*[T](): Symbol[T] =
   return Symbol[T](kind: SymbolKind.Nil)
-
-proc End*[T](): Symbol[T] =
-  return Symbol[T](kind: SymbolKind.End)
 
 proc Empty*[T](): Symbol[T] =
   return Symbol[T](kind: SymbolKind.Empty)
