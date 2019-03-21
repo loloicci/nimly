@@ -29,7 +29,7 @@ Example is as follows.
     r"false":
       return TokenFalse()
     ## you can use ``..`` instead of ``-`` in ``[]``.
-    r"[a..zA..Z-_][a..zA..Z0..9\-_]*":
+    r"[a..zA..Z\-_][a..zA..Z0..9\-_]*":
       return TokenIdentifier(token)
 
 Meta charactors are as following:
