@@ -10,3 +10,10 @@ test "test state":
 
   testStatePar.initParser()
   check testStatePar.parse(lexer) == "IF(test+1)THEN{true}ELSE{(2*(test+3))}"
+
+test "test state (read from file)":
+  var lexer = testStateLex.open("tests/state_example.txt")
+  lexer.ignoreIf = proc(r: StateToken): bool = r.kind == StateTokenKind.SIGNORE
+
+  testStatePar.initParser()
+  check testStatePar.parse(lexer) == "IF(test+1)THEN{true}ELSE{(2*(test+3))}"
