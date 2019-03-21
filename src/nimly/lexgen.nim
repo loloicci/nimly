@@ -883,24 +883,13 @@ proc convertToReSynTree*(re: string, nextPos: var int): ReSynTree =
                right = ~Term(lit = Char(pos = -1, c = End()))).reassignPos(
                  nextPos)
 
-macro niml*(name, body: untyped): untyped =
-  name.expectKind(nnkBracketExpr)
-  body.expectKind(nnkStmtList)
-  let
-    nameStr = $name[0].ident
-    typeIdent = name[1].ident
-  result = newStmtList()
+proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
   var
-    procs: seq[NimNode] = @[]
     lexerMakerBody = newStmtList()
+    procs: seq[NimNode] = @[]
 
-  # var newPos = 0
-  let newPos = genSym(nskVar)
-  lexerMakerBody.add(
-    newVarStmt(
-      newPos,
-      newIntLitNode(0))
-  )
+  # init part
+
   # var app = newAccPosProc[T]()
   let app = genSym(nskVar)
   lexerMakerBody.add(
@@ -910,21 +899,8 @@ macro niml*(name, body: untyped): untyped =
         newTree(
           nnkBracketExpr,
           newIdentNode("newAccPosProc"),
-          newIdentNode(typeIdent)
+          typeId
         )
-      )
-    )
-  )
-  # var wholeRst: ReSynTree
-  let wholeRst = genSym(nskVar)
-  lexerMakerBody.add(
-    newTree(
-      nnkVarSection,
-      newTree(
-        nnkIdentDefs,
-        wholeRst,
-        newIdentNode("ReSynTree"),
-        newEmptyNode()
       )
     )
   )
@@ -944,6 +920,29 @@ macro niml*(name, body: untyped): untyped =
       )
     )
   )
+
+  # var wholeRst: ReSynTree
+  let wholeRst = genSym(nskVar)
+  lexerMakerBody.add(
+    newTree(
+      nnkVarSection,
+      newTree(
+        nnkIdentDefs,
+        wholeRst,
+        newIdentNode("ReSynTree"),
+        newEmptyNode()
+      )
+    )
+  )
+
+  # var newPos = 0
+  let newPos = genSym(nskVar)
+  lexerMakerBody.add(
+    newVarStmt(
+      newPos,
+      newIntLitNode(0))
+  )
+
   # var rst: ReSynTree
   let rst = genSym(nskVar)
   lexerMakerBody.add(
@@ -957,41 +956,41 @@ macro niml*(name, body: untyped): untyped =
       )
     )
   )
-  if body.len < 1:
-    error "no cloud"
-  for i, cloud in body:
-    if cloud.kind == nnkCommentStmt:
-      continue
-    cloud.expectKind(nnkCall)
-    cloud[0].expectKind({nnkRStrLit, nnkStrLit})
-    cloud[1].expectKind(nnkStmtList)
+
+  # clause parser
+  proc parseClause(clause: NimNode, first: bool,
+                   lexerMakerBody: var NimNode, procs: var seq[NimNode]) =
+    clause.expectKind(nnkCall)
+    clause[0].expectKind({nnkRStrLit, nnkStrLit})
+    clause[1].expectKind(nnkStmtList)
     let
-      reStr = cloud[0].strVal
+      reStr = clause[0].strVal
       param = newTree(nnkIdentDefs,
                       newIdentNode("token"),
                       newIdentNode("LToken"),
                       newEmptyNode())
+    # make proc to return token
     let
       procName = genSym(nskProc)
       procNode = newProc(
         name = procName,
-        params = @[newIdentNode(typeIdent), param],
-        body = cloud[1]
+        params = @[typeId, param],
+        body = clause[1]
       )
     procs.add(procNode)
 
-    # rst = (meta cloud[0]).convertToReSynTree(newPos)
+    # rst = (meta clause[0]).convertToReSynTree(newPos)
     lexerMakerBody.add(
       newAssignment(
         rst,
         newCall(
           newIdentNode("convertToReSynTree"),
-          cloud[0],
+          clause[0],
           newPos
         )
       )
     )
-    if i == 0:
+    if first:
       # wholeRst = rst
       lexerMakerBody.add(
         newAssignment(
@@ -1053,9 +1052,21 @@ macro niml*(name, body: untyped): untyped =
         )
       )
     )
-  result.add(procs)
 
-  # let lr = LexRe[(meta typeIdent)](st: wholeRst, accPosProc: app)
+  if body.len < 1:
+    error "no clouse in niml"
+
+  # main part
+  var first = true
+  for clause in body:
+    if clause.kind == nnkCommentStmt:
+      continue
+    clause.parseClause(first, lexerMakerBody, procs)
+    first = false
+
+    # make tail of lexerMakerBody
+
+  # let lr = LexRe[(meta typeId)](st: wholeRst, accPosProc: app)
   let lrId = genSym()
   lexerMakerBody.add(
     nnkLetSection.newTree(
@@ -1065,7 +1076,7 @@ macro niml*(name, body: untyped): untyped =
         nnkObjConstr.newTree(
           nnkBracketExpr.newTree(
             newIdentNode("LexRe"),
-            newIdentNode(typeIdent)
+            typeId
           ),
           nnkExprColonExpr.newTree(
             newIdentNode("st"),
@@ -1080,7 +1091,7 @@ macro niml*(name, body: untyped): untyped =
     )
   )
 
-  # let dfa = makeDFA[(meta typeIdent)](lr)
+  # let dfa = makeDFA[(meta typeId)](lr)
   let dfaId = genSym()
   lexerMakerBody.add(
     nnkLetSection.newTree(
@@ -1090,13 +1101,14 @@ macro niml*(name, body: untyped): untyped =
         nnkCall.newTree(
           nnkBracketExpr.newTree(
             newIdentNode("makeDFA"),
-            newIdentNode(typeIdent)
+            typeId
           ),
           lrId
         )
       )
     )
   )
+
   # let minimizedDfa = minimizeStates(dfa)
   let minimizedDfa = genSym()
   when defined(nimlnonmin):
@@ -1140,7 +1152,26 @@ macro niml*(name, body: untyped): untyped =
       )
     )
   )
-  # proc ...Maker(): LexData[(meta typeIdent)] =
+
+  return (lexerMakerBody, procs)
+
+macro niml*(name, body: untyped): untyped =
+  name.expectKind(nnkBracketExpr)
+  body.expectKind(nnkStmtList)
+  let
+    nameStr = $name[0].ident
+    typeId = name[1]
+  result = newStmtList()
+
+  # make lexerMakerBody
+  let (lexerMakerBody, procs) = makeLexerMakerBody(typeId, body)
+
+  # add procs to result
+  result.add(procs)
+
+  # define proc lexerMaker in result
+
+  # proc ...Maker(): LexData[(meta typeId)] =
   #   (meta lexerMakerBody)
   let makerName = genSym(nskProc)
   result.add(
@@ -1148,11 +1179,14 @@ macro niml*(name, body: untyped): untyped =
       name = makerName,
       params = @[
         nnkBracketExpr.newTree(newIdentNode("LexData"),
-                               newIdentNode(typeIdent))
+                               typeId)
       ],
       body = lexerMakerBody
     )
   )
+
+  # call lexerMaker and define lexerTable as const in result
+
   # const (meta nameStr) = ...Maker()
   result.add(
     nnkStmtList.newTree(
@@ -1170,5 +1204,6 @@ macro niml*(name, body: untyped): untyped =
       )
     )
   )
+
   when defined(nimldebug):
     echo toStrLit(result)
