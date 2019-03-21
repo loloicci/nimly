@@ -895,15 +895,17 @@ macro niml*(name, body: untyped): untyped =
     lexerMakerBody = newStmtList()
 
   # var newPos = 0
+  let newPos = genSym(nskVar)
   lexerMakerBody.add(
     newVarStmt(
-      newIdentNode("newPos"),
+      newPos,
       newIntLitNode(0))
   )
   # var app = newAccPosProc[T]()
+  let app = genSym(nskVar)
   lexerMakerBody.add(
     newVarStmt(
-      newIdentNode("app"),
+      app,
       newCall(
         newTree(
           nnkBracketExpr,
@@ -914,23 +916,25 @@ macro niml*(name, body: untyped): untyped =
     )
   )
   # var wholeRst: ReSynTree
+  let wholeRst = genSym(nskVar)
   lexerMakerBody.add(
     newTree(
       nnkVarSection,
       newTree(
         nnkIdentDefs,
-        newIdentNode("wholeRst"),
+        wholeRst,
         newIdentNode("ReSynTree"),
         newEmptyNode()
       )
     )
   )
   # var acc: seq[Pos]
+  let acc = genSym(nskVar)
   lexerMakerBody.add(
     nnkStmtList.newTree(
       nnkVarSection.newTree(
         nnkIdentDefs.newTree(
-          newIdentNode("acc"),
+          acc,
           nnkBracketExpr.newTree(
             newIdentNode("seq"),
             newIdentNode("Pos")
@@ -941,11 +945,12 @@ macro niml*(name, body: untyped): untyped =
     )
   )
   # var rst: ReSynTree
+  let rst = genSym(nskVar)
   lexerMakerBody.add(
     nnkStmtList.newTree(
       nnkVarSection.newTree(
         nnkIdentDefs.newTree(
-          newIdentNode("rst"),
+          rst,
           newIdentNode("ReSynTree"),
           newEmptyNode()
         )
@@ -974,14 +979,15 @@ macro niml*(name, body: untyped): untyped =
         body = cloud[1]
       )
     procs.add(procNode)
+
     # rst = (meta cloud[0]).convertToReSynTree(newPos)
     lexerMakerBody.add(
       newAssignment(
-        newIdentNode("rst"),
+        rst,
         newCall(
           newIdentNode("convertToReSynTree"),
           cloud[0],
-          newIdentNode("newPos")
+          newPos
         )
       )
     )
@@ -989,8 +995,8 @@ macro niml*(name, body: untyped): untyped =
       # wholeRst = rst
       lexerMakerBody.add(
         newAssignment(
-          newIdentNode("wholeRst"),
-          newIdentNode("rst")
+          wholeRst,
+          rst
         )
       )
     else:
@@ -999,29 +1005,30 @@ macro niml*(name, body: untyped): untyped =
       #                ~wholeRst)
       lexermakerBody.add(
         newAssignment(
-          newIdentNode("wholeRst"),
+          wholeRst,
           newCall(
             newIdentNode("Bin"),
             newIdentNode("bor"),
             nnkPrefix.newTree(
               newIdentNode("~"),
-              newIdentNode("wholeRst")
+              wholeRst
             ),
             nnkPrefix.newTree(
               newIdentNode("~"),
-              newIdentNode("rst")
+              rst
             )
           )
         )
       )
+
     # acc = accPos(rst)
     lexerMakerBody.add(
       nnkStmtList.newTree(
         nnkAsgn.newTree(
-          newIdentNode("acc"),
+          acc,
           nnkCall.newTree(
             newIdentNode("accPos"),
-            newIdentNode("rst")
+            rst
           )
         )
       )
@@ -1032,13 +1039,13 @@ macro niml*(name, body: untyped): untyped =
       nnkStmtList.newTree(
         nnkForStmt.newTree(
           newIdentNode("a"),
-          newIdentNode("acc"),
+          acc,
           nnkStmtList.newTree(
             nnkCall.newTree(
               nnkAccQuoted.newTree(
                 newIdentNode("[]=")
               ),
-              newIdentNode("app"),
+              app,
               newIdentNode("a"),
               procName
             )
@@ -1047,11 +1054,13 @@ macro niml*(name, body: untyped): untyped =
       )
     )
   result.add(procs)
+
   # let lr = LexRe[(meta typeIdent)](st: wholeRst, accPosProc: app)
+  let lrId = genSym()
   lexerMakerBody.add(
     nnkLetSection.newTree(
       nnkIdentDefs.newTree(
-        newIdentNode("lr"),
+        lrId,
         newEmptyNode(),
         nnkObjConstr.newTree(
           nnkBracketExpr.newTree(
@@ -1060,41 +1069,44 @@ macro niml*(name, body: untyped): untyped =
           ),
           nnkExprColonExpr.newTree(
             newIdentNode("st"),
-            newIdentNode("wholeRst")
+            wholeRst
           ),
           nnkExprColonExpr.newTree(
             newIdentNode("accPosProc"),
-            newIdentNode("app")
+            app
           )
         )
       )
     )
   )
+
   # let dfa = makeDFA[(meta typeIdent)](lr)
+  let dfaId = genSym()
   lexerMakerBody.add(
     nnkLetSection.newTree(
       nnkIdentDefs.newTree(
-        newIdentNode("dfa"),
+        dfaId,
         newEmptyNode(),
         nnkCall.newTree(
           nnkBracketExpr.newTree(
             newIdentNode("makeDFA"),
             newIdentNode(typeIdent)
           ),
-          newIdentNode("lr")
+          lrId
         )
       )
     )
   )
   # let minimizedDfa = minimizeStates(dfa)
+  let minimizedDfa = genSym()
   when defined(nimlnonmin):
     lexerMakerBody.add(
       nnkStmtList.newTree(
         nnkLetSection.newTree(
           nnkIdentDefs.newTree(
-            newIdentNode("minimizedDfa"),
+            minimizedDfa,
             newEmptyNode(),
-            newIdentNode("dfa")
+            dfaId
           )
         )
       )
@@ -1105,16 +1117,17 @@ macro niml*(name, body: untyped): untyped =
       nnkStmtList.newTree(
         nnkLetSection.newTree(
           nnkIdentDefs.newTree(
-            newIdentNode("minimizedDfa"),
+            minimizedDfa,
             newEmptyNode(),
             nnkCall.newTree(
               newIdentNode("minimizeStates"),
-              newIdentNode("dfa")
+              dfaId
             )
           )
         )
       )
     )
+
   # result = convertToLexData(dfa)
   lexerMakerBody.add(
     nnkStmtList.newTree(
@@ -1122,7 +1135,7 @@ macro niml*(name, body: untyped): untyped =
         newIdentNode("result"),
         nnkCall.newTree(
           newIdentNode("convertToLexData"),
-          newIdentNode("minimizedDfa")
+          minimizedDfa
         )
       )
     )
