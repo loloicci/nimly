@@ -6,6 +6,8 @@ import patty
 
 import lextypes
 
+export tables
+export sets
 
 proc `~`*[T](obj: T): ref T =
   new(result)
@@ -880,9 +882,6 @@ proc convertToReSynTree*(re: string, nextPos: var int): ReSynTree =
                left = ~re.convertToSeqRePart.handleSubpattern,
                right = ~Term(lit = Char(pos = -1, c = End()))).reassignPos(
                  nextPos)
-
-export tables
-export sets
 
 macro niml*(name, body: untyped): untyped =
   name.expectKind(nnkBracketExpr)

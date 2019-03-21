@@ -22,25 +22,27 @@ proc accProc[T](ld: LexData[T], str: string): AccProc[T] =
   return ld.dba[fs].accept.fun
 
 
+niml testLex0[string]:
+  r"if":
+    return "acc"
+
 test "test macro niml (if)":
-  niml testLex[string]:
-    r"if":
-      return "acc"
-  check testLex.doesAccept("if")
-  check testLex.accProc("if")(LToken(token: "if")) == "acc"
-  check (not testLex.doesAccept("i"))
-  check (not testLex.doesAccept("else"))
-  check (not testLex.doesAccept("iff"))
+  check testLex0.doesAccept("if")
+  check testLex0.accProc("if")(LToken(token: "if")) == "acc"
+  check (not testLex0.doesAccept("i"))
+  check (not testLex0.doesAccept("else"))
+  check (not testLex0.doesAccept("iff"))
+
+niml testLex1[string]:
+  r"if":
+    return token.token
+  r"else":
+    return "acc"
 
 test "test macro niml (if/elif)":
-  niml testLex[string]:
-    r"if":
-      return token.token
-    r"else":
-      return "acc"
-  check testLex.doesAccept("if")
-  check testLex.accProc("if")(LToken(token: "if")) == "if"
-  check (not testLex.doesAccept("i"))
-  check testLex.doesAccept("else")
-  check testLex.accProc("else")(LToken(token: "else")) == "acc"
-  check (not testLex.doesAccept("iff"))
+  check testLex1.doesAccept("if")
+  check testLex1.accProc("if")(LToken(token: "if")) == "if"
+  check (not testLex1.doesAccept("i"))
+  check testLex1.doesAccept("else")
+  check testLex1.accProc("else")(LToken(token: "else")) == "acc"
+  check (not testLex1.doesAccept("iff"))

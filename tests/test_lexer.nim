@@ -23,14 +23,15 @@ proc accProc[T](ld: LexData[T], str: string): AccProc[T] =
   assert ld.dba[fs].accept.kind == AcceptKind.Acc
   return ld.dba[fs].accept.fun
 
+niml testLex[string]:
+  r"if":
+    return token.token
+  r"else":
+    return "acc"
+  r"\s":
+    return ""
+
 test "test macro nimly (if/else)":
-  niml testLex[string]:
-    r"if":
-      return token.token
-    r"else":
-      return "acc"
-    r"\s":
-      return ""
   var testLexer = testLex.newWithString("""if
 else if
 else""")
