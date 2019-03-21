@@ -60,7 +60,7 @@ type
   Rule*[T] = object
     left*: Symbol[T]
     right*: seq[Symbol[T]]
-  LALRItem[T] = object
+  LRItem[T] = object
     rule: Rule[T]
     pos: int
 
@@ -73,8 +73,8 @@ type
   FollowTable[T] = Table[Symbol[T], HashSet[Symbol[T]]]
   FirstTable[T] = Table[Symbol[T], HashSet[Symbol[T]]]
 
-  LALRItems[T] = HashSet[LALRItem[T]]
-  SetOfLALRItems[T] = OrderedSet[LALRItems[T]]
+  LRItems[T] = HashSet[LRItem[T]]
+  SetOfLRItems[T] = OrderedSet[LRItems[T]]
 
 
 proc `$`*[T](ft: FollowTable[T]): string =
@@ -83,7 +83,7 @@ proc `$`*[T](ft: FollowTable[T]): string =
     result = result & $i & ":" & $itms & "\n"
   result = result & "--------\n"
 
-proc `$`*[T](s: SetOfLALRItems[T]): string =
+proc `$`*[T](s: SetOfLRItems[T]): string =
   result = "CanonicalCollection:\n--------\n"
   for i, itms in s:
     result = result & $i & ":" & $itms & "\n"
@@ -107,7 +107,7 @@ proc hash*[T](x: Rule[T]): Hash =
   h = h !& hash(x.right)
   return !$h
 
-proc hash*[T](x: LALRItem[T]): Hash =
+proc hash*[T](x: LRItem[T]): Hash =
   var h: Hash = 0
   h = h !& hash(x.rule)
   h = h !& hash(x.pos)
@@ -383,49 +383,49 @@ proc startRule[T](g: Grammar[T]): Rule[T] =
   for r in ret:
     result = r
 
-proc next[T](i: LALRItem[T]): Symbol[T] =
+proc next[T](i: LRItem[T]): Symbol[T] =
   if i.pos >= i.rule.len:
     return Nil[T]()
   result = i.rule.right[i.pos]
 
-proc pointForward[T](i: LALRItem[T]): LALRItem[T] =
+proc pointForward[T](i: LRItem[T]): LRItem[T] =
   doAssert i.pos < i.rule.len
-  result = LALRItem[T](rule: i.rule, pos: i.pos + 1)
+  result = LRItem[T](rule: i.rule, pos: i.pos + 1)
 
-proc closure[T](g: Grammar[T], whole: LALRItems[T]): LALRItems[T] =
+proc closure[T](g: Grammar[T], whole: LRItems[T]): LRItems[T] =
   result = whole
   var checkSet = whole
   while checkSet.len > 0:
-    var new: LALRItems[T]
+    var new: LRItems[T]
     new.init()
     for i in checkSet:
       match i.next:
         NonTermS:
           for r in g.filterRulesLeftIs(i.next):
-            let n = LALRItem[T](rule: r, pos: 0)
+            let n = LRItem[T](rule: r, pos: 0)
             if not result.containsOrIncl(n):
               new.incl(n)
         _:
           discard
     checkSet = new
 
-proc goto[T](g: Grammar[T], itms: LALRItems[T], s: Symbol[T]): LALRItems[T] =
+proc goto[T](g: Grammar[T], itms: LRItems[T], s: Symbol[T]): LRItems[T] =
   doAssert s.kind != SymbolKind.Nil
   assert itms == g.closure(itms)
-  var gotoSet = initSet[LALRItem[T]]()
+  var gotoSet = initSet[LRItem[T]]()
   for i in itms:
     if i.next == s:
       gotoSet.incl(i.pointForward)
   result = g.closure(gotoSet)
 
-proc makeCanonicalCollection[T](g: Grammar[T]): SetOfLALRItems[T] =
-  let init = g.closure([LALRItem[T](rule: g.startRule, pos: 0)].toSet)
+proc makeCanonicalCollection[T](g: Grammar[T]): SetOfLRItems[T] =
+  let init = g.closure([LRItem[T](rule: g.startRule, pos: 0)].toSet)
   result = [
     init
   ].toOrderedSet
   var checkSet = result
   while checkSet.len > 0:
-    var new: SetOfLALRItems[T]
+    var new: SetOfLRItems[T]
     new.init()
     for itms in checkSet:
       assert itms == g.closure(itms)
