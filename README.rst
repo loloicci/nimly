@@ -179,3 +179,10 @@ Contribute
 3. Commit your change
 4. Push it to the branch
 5. Create new pull request
+
+Developing
+==========
+You can use ``nimldebug`` and ``nimydebug`` as a conditional symbol
+to print debug info.
+
+example: ``nim c -d:nimldebug -d:nimydebug -r tests/test_nimly.nim``
