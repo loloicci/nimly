@@ -1,6 +1,4 @@
 import tables
-import sets
-import hashes
 
 import patty
 

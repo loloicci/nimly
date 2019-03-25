@@ -1,15 +1,11 @@
 import tables
 import hashes
 import sets
-import algorithm
-import strutils
 
 import patty
 
 import parsetypes
 import parser
-import lextypes
-import lexer
 
 type
   LRItem*[T] = object
