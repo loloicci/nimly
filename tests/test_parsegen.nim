@@ -5,7 +5,9 @@ import strutils
 import nimly/lextypes
 import nimly/lexgen
 import nimly/lexer
-import nimly/lalr
+import nimly/lr
+import nimly/parsetypes
+import nimly/parser
 import nimly/parsegen
 
 type
