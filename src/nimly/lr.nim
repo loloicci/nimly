@@ -136,3 +136,14 @@ proc makeTable*[T](g: Grammar[T]): ParsingTable[T] =
     echo ag.followTable
     echo canonicalCollection
     echo result
+
+proc filterKernel*[T](cc: SetOfLRItems[T]): SetOfLRItems[T] =
+  result = initOrderedSet[LRItems[T]]()
+  let start = NonTermS[T]("__Start__")
+  for i, itms in cc:
+    for itm in itms:
+      var kernelItems = initSet[LRItem[T]]()
+      for itm in itms:
+        if itm.pos != 0 or itm.rule.left == start:
+          kernelItems.incl(itm)
+      result.incl(kenelItems)
