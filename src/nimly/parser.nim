@@ -7,6 +7,7 @@ import lexer
 import parsetypes
 
 type
+  State* = int
   ActionTableItemKind* {.pure.} = enum
     Shift
     Reset
@@ -20,7 +21,6 @@ type
       rule*: Rule[T]
     else:
       discard
-  State = int
 
 proc `$`*[T](i: ActionTableItem[T]): string =
   match i:

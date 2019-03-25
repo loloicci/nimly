@@ -12,8 +12,6 @@ type
     rule*: Rule[T]
     pos*: int
 
-  State = int
-
   LRItems[T] = HashSet[LRItem[T]]
   SetOfLRItems[T] = OrderedSet[LRItems[T]]
 
