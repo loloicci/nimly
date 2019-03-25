@@ -90,7 +90,7 @@ proc makeCanonicalCollection*[T](g: Grammar[T]): SetOfLRItems[T] =
     checkSet = new
   doAssert result.indexOf(init) == 0, "init state is not '0'"
 
-proc makeTable*[T](g: Grammar[T]): ParsingTable[T] =
+proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
   var
     actionTable: ActionTable[T]
     gotoTable: GotoTable[T]

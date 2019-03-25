@@ -318,7 +318,7 @@ proc addVarIntToSym(stm : var NimNode,
       )
     )
 
-proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
+proc tableMakerProc(name, tokenType, tokenKind, topNonTerm, tableMaker: NimNode,
                     rules, ruleDefs, syms: seq[NimNode]): NimNode =
   var body = nnkStmtList.newTree()
   for rd in ruleDefs:
@@ -371,7 +371,7 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
       tmpTable,
       nnkCall.newTree(
         nnkBracketExpr.newTree(
-          newIdentNode("makeTable"),
+          tableMaker,
           tokenKind
         ),
         grmId
@@ -409,6 +409,7 @@ macro nimy*(head, body: untyped): untyped =
     parserName = head[0]
     tokenType = head[1]
     tokenKind = parseStmt($tokenType.ident & "Kind")[0]
+    tableMaker = newIdentNode("makeTableLR")
   var
     nimyInfo = initNimyInfo()
     nonTerms = initSet[string]()
@@ -556,8 +557,8 @@ macro nimy*(head, body: untyped): untyped =
   var
     tableName: NimNode
   result.add(
-    tableMakerProc(tmpName, tokenType, tokenKind, topNonTermNode, ruleIds,
-                   ruleDefs, symNodes)
+    tableMakerProc(tmpName, tokenType, tokenKind, topNonTermNode, tableMaker,
+                   ruleIds, ruleDefs, symNodes)
   )
   var constTableName: NimNode
   when defined(nimylet):
