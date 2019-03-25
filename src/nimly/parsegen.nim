@@ -6,7 +6,6 @@ import patty
 
 import parsetypes
 import parser
-import lr
 
 type
   PTProc[T, S, R] = proc(tree: ParseTree[T, S]): R {.nimcall.}
