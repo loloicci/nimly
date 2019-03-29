@@ -8,9 +8,9 @@ import parsetypes
 import parser
 
 type
-  LRItem*[T] = object
-    rule*: Rule[T]
-    pos*: int
+  LRItem*[T] = object of RootObj
+    rule: Rule[T]
+    pos: int
 
   LRItems[T] = HashSet[LRItem[T]]
   SetOfLRItems[T] = OrderedSet[LRItems[T]]
