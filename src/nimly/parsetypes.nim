@@ -13,7 +13,7 @@ type
   SymbolKind* {.pure.} = enum
     TermS
     NonTermS
-    Nil
+    Dummy
     End
     Empty
   Symbol*[T] = object
@@ -46,8 +46,8 @@ proc `==`*[T](a, b: Symbol[T]): bool =
 proc NonTermS*[T](nonTerm: sym): Symbol[T] =
   return Symbol[T](kind: SymbolKind.NonTermS, nonTerm: nonTerm)
 
-proc Nil*[T](): Symbol[T] =
-  return Symbol[T](kind: SymbolKind.Nil)
+proc Dummy*[T](): Symbol[T] =
+  return Symbol[T](kind: SymbolKind.Dummy)
 
 proc End*[T](): Symbol[T] =
   return Symbol[T](kind: SymbolKind.End)
