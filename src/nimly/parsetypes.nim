@@ -14,6 +14,7 @@ type
     TermS
     NonTermS
     Nil
+    End
     Empty
   Symbol*[T] = object
     case kind*: SymbolKind
@@ -47,6 +48,9 @@ proc NonTermS*[T](nonTerm: sym): Symbol[T] =
 
 proc Nil*[T](): Symbol[T] =
   return Symbol[T](kind: SymbolKind.Nil)
+
+proc End*[T](): Symbol[T] =
+  return Symbol[T](kind: SymbolKind.End)
 
 proc Empty*[T](): Symbol[T] =
   return Symbol[T](kind: SymbolKind.Empty)
@@ -198,7 +202,7 @@ proc makeFollowTable[T](g: Grammar[T]): FollowTable[T] =
     var initSet: HashSet[Symbol[T]]
     initSet.init()
     result[s] = initSet
-  result[g.start].incl(Nil[T]())
+  result[g.start].incl(End[T]())
   var fCnt = true
   while fCnt:
     fCnt = false
@@ -210,7 +214,7 @@ proc makeFollowTable[T](g: Grammar[T]): FollowTable[T] =
       # for sym in r.right.reversed
       for i in countdown(r.right.len - 1, 0):
         let sym = r.right[i]
-        assert sym != Nil[T]()
+        assert sym != End[T]()
         match sym:
           TermS:
             # renew meta data

@@ -203,7 +203,7 @@ proc parseImpl*[T, S](parser: var Parser[S],
         token = lexer.lexNext
         symbol = TermS[S](token.kind)
       except NimlEOFError:
-        symbol = Nil[S]()
+        symbol = End[S]()
       except:
         raise
       parser.push(s)

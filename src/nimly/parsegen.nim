@@ -547,7 +547,7 @@ macro nimy*(head, body: untyped): untyped =
   symNodes.add(
     newCall(
       nnkBracketExpr.newTree(
-        newIdentNode("Nil"),
+        newIdentNode("End"),
         tokenKind
       )
     )

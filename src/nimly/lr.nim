@@ -29,7 +29,7 @@ proc `$`*[T](s: SetOfLRItems[T]): string =
 
 proc next*[T](i: LRItem[T]): Symbol[T] =
   if i.pos >= i.rule.len:
-    return Nil[T]()
+    return End[T]()
   result = i.rule.right[i.pos]
 
 proc pointForward*[T](i: LRItem[T]): LRItem[T] =
@@ -54,7 +54,7 @@ proc closure*[T](g: Grammar[T], whole: LRItems[T]): LRItems[T] =
     checkSet = new
 
 proc goto*[T](g: Grammar[T], itms: LRItems[T], s: Symbol[T]): LRItems[T] =
-  doAssert s.kind != SymbolKind.Nil
+  doAssert s.kind != SymbolKind.End
   assert itms == g.closure(itms)
   var gotoSet = initSet[LRItem[T]]()
   for i in itms:
@@ -80,7 +80,7 @@ proc makeCanonicalCollection*[T](g: Grammar[T]): SetOfLRItems[T] =
     for itms in checkSet:
       assert itms == g.closure(itms)
       var done = initSet[Symbol[T]]()
-      done.incl(Nil[T]())
+      done.incl(End[T]())
       for i in itms:
         let s = i.next
         if (not done.containsOrIncl(s)):
@@ -116,12 +116,12 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
           let i = canonicalCollection.indexOf(ag.goto(itms, sym))
           assert i > -1, "There is no 'items' which is equal to 'goto'"
           gotoTable[idx][sym] = i
-        Nil:
+        End:
           if item.rule.left == ag.start:
-            actionTable[idx][Nil[T]()] = Accept[T]()
+            actionTable[idx][End[T]()] = Accept[T]()
           else:
             for flw in ag.followTable[item.rule.left]:
-              if flw.kind == SymbolKind.TermS or flw.kind == SymbolKind.Nil:
+              if flw.kind == SymbolKind.TermS or flw.kind == SymbolKind.End:
                 actionTable[idx][flw] = Reset[T](item.rule)
         _:
           discard
