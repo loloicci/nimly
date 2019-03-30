@@ -8,12 +8,14 @@ import parsetypes
 import parser
 
 type
-  LRItem*[T] = object of RootObj
+  LRItem*[T] = object
     rule: Rule[T]
     pos: int
 
   LRItems[T] = HashSet[LRItem[T]]
   SetOfLRItems[T] = OrderedSet[LRItems[T]]
+
+  TransTable = seq[HashSet[int]]
 
 proc indexOf[T](os: OrderedSet[T], element: T): int =
   for i, key in os:
@@ -36,7 +38,7 @@ proc pointForward*[T](i: LRItem[T]): LRItem[T] =
   doAssert i.pos < i.rule.len
   result = LRItem[T](rule: i.rule, pos: i.pos + 1)
 
-proc closure*[T](g: Grammar[T], whole: LRItems[T]): LRItems[T] =
+proc closure[T](g: Grammar[T], whole: LRItems[T]): LRItems[T] =
   result = whole
   var checkSet = whole
   while checkSet.len > 0:
@@ -53,7 +55,7 @@ proc closure*[T](g: Grammar[T], whole: LRItems[T]): LRItems[T] =
           discard
     checkSet = new
 
-proc goto*[T](g: Grammar[T], itms: LRItems[T], s: Symbol[T]): LRItems[T] =
+proc goto[T](g: Grammar[T], itms: LRItems[T], s: Symbol[T]): LRItems[T] =
   doAssert s.kind != SymbolKind.End
   assert itms == g.closure(itms)
   var gotoSet = initSet[LRItem[T]]()
@@ -68,16 +70,20 @@ proc hash*[T](x: LRItem[T]): Hash =
   h = h !& hash(x.pos)
   return !$h
 
-proc makeCanonicalCollection*[T](g: Grammar[T]): SetOfLRItems[T] =
+proc makeCanonicalCollection*[T](g: Grammar[T]): (SetOfLRItems[T], TransTable) =
   let init = g.closure([LRItem[T](rule: g.startRule, pos: 0)].toSet)
-  result = [
-    init
-  ].toOrderedSet
-  var checkSet = result
+  var
+    cc = [
+      init
+    ].toOrderedSet
+    checkSet = cc
+    tt: TransTable = @[]
+  tt.add(initSet[int]())
   while checkSet.len > 0:
     var new: SetOfLRItems[T]
     new.init()
     for itms in checkSet:
+      let frm = cc.indexOf(itms)
       assert itms == g.closure(itms)
       var done = initSet[Symbol[T]]()
       done.incl(End[T]())
@@ -85,10 +91,14 @@ proc makeCanonicalCollection*[T](g: Grammar[T]): SetOfLRItems[T] =
         let s = i.next
         if (not done.containsOrIncl(s)):
           let gt = goto[T](g, itms, s)
-          if (not result.containsOrIncl(gt)):
+          if (not cc.containsOrIncl(gt)):
+            tt.add(initSet[int]())
+            assert cc.card == tt.len
             new.incl(gt)
+          tt[frm].incl(cc.indexOf(gt))
     checkSet = new
-  doAssert result.indexOf(init) == 0, "init state is not '0'"
+  doAssert cc.indexOf(init) == 0, "init state is not '0'"
+  result = (cc, tt)
 
 proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
   var
@@ -101,7 +111,7 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
            g
          else:
            g.augument
-    canonicalCollection = makeCanonicalCollection[T](ag)
+    (canonicalCollection, tt) = makeCanonicalCollection[T](ag)
   for idx, itms in canonicalCollection:
     actionTable[idx] = initTable[Symbol[T], ActionTableItem[T]]()
     gotoTable[idx] = initTable[Symbol[T], State]()

@@ -255,3 +255,22 @@ proc augument*[T](g: Grammar[T]): Grammar[T] =
   result = initGrammar(newRules, start)
   result.firstTable = result.makeFirstTable
   result.followTable = result.makeFollowTable
+
+proc calFirsts*[T](g: Grammar[T], symbols: seq[Symbol[T]]): HashSet[Symbol[T]] =
+  assert g.isAugument
+  result.init
+  for s in symbols:
+    match s:
+      NonTermS:
+        let firsts = g.firstTable[s]
+        result.incl(firsts)
+        if not (Empty[T]() in firsts):
+          return
+      TermS:
+        result.incl(s)
+        return
+      End:
+        result.incl(s)
+        return
+      _:
+        doAssert false
