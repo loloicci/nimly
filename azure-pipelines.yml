@@ -1,0 +1,13 @@
+trigger:
+- master
+
+pr:
+- master
+
+pool:
+  vmImage: 'Ubuntu-16.04'
+
+container: loloiccl/ubuntu-mynim
+
+steps:
+- script: nimble test -y
