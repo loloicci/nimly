@@ -3,6 +3,8 @@
 #######
 A lexer generator and the parser generator work in Nim-lang.
 
+.. image:: https://dev.azure.com/oxisccl/nimly/_apis/build/status/loloiccl.nimly%20(1)?branchName=master
+
 niml
 ====
 niml is a lexer generator work in Nim-lang.
