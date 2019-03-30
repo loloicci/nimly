@@ -1,9 +1,9 @@
 #######
  nimly
 #######
-A lexer generator and the parser generator work in Nim-lang.
+.. image:: https://dev.azure.com/oxisccl/nimly/_apis/build/status/loloiccl.nimly?branchName=master
 
-.. image:: https://dev.azure.com/oxisccl/nimly/_apis/build/status/loloiccl.nimly%20(1)?branchName=master
+A lexer generator and the parser generator work in Nim-lang.
 
 niml
 ====
