@@ -132,6 +132,9 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
           else:
             for flw in ag.followTable[item.rule.left]:
               if flw.kind == SymbolKind.TermS or flw.kind == SymbolKind.End:
+                if actionTable[idx].haskey(flw) and
+                   actionTable[idx][flw].kind == ActionTableItemKind.Shift:
+                  continue
                 actionTable[idx][flw] = Reset[T](item.rule)
         _:
           discard
