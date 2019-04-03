@@ -12,10 +12,13 @@ type
     rule: Rule[T]
     pos: int
 
-  LRItems[T] = HashSet[LRItem[T]]
-  SetOfLRItems[T] = OrderedSet[LRItems[T]]
+  LRItems*[T] = HashSet[LRItem[T]]
+  SetOfLRItems*[T] = OrderedSet[LRItems[T]]
 
-  TransTable = seq[HashSet[int]]
+  TransTable*[T] = seq[Table[Symbol[T], int]]
+
+proc initTransTableRow[T](): Table[Symbol[T], int] =
+  result = initTable[Symbol[T], int]()
 
 proc indexOf[T](os: OrderedSet[T], element: T): int =
   for i, key in os:
@@ -70,15 +73,16 @@ proc hash*[T](x: LRItem[T]): Hash =
   h = h !& hash(x.pos)
   return !$h
 
-proc makeCanonicalCollection*[T](g: Grammar[T]): (SetOfLRItems[T], TransTable) =
+proc makeCanonicalCollection*[T](g: Grammar[T]): (SetOfLRItems[T],
+                                                  TransTable[T]) =
   let init = g.closure([LRItem[T](rule: g.startRule, pos: 0)].toSet)
   var
     cc = [
       init
     ].toOrderedSet
     checkSet = cc
-    tt: TransTable = @[]
-  tt.add(initSet[int]())
+    tt: TransTable[T] = @[]
+  tt.add(initTransTableRow[T]())
   while checkSet.len > 0:
     var new: SetOfLRItems[T]
     new.init()
@@ -92,10 +96,10 @@ proc makeCanonicalCollection*[T](g: Grammar[T]): (SetOfLRItems[T], TransTable) =
         if (not done.containsOrIncl(s)):
           let gt = goto[T](g, itms, s)
           if (not cc.containsOrIncl(gt)):
-            tt.add(initSet[int]())
+            tt.add(initTransTableRow[T]())
             assert cc.card == tt.len
             new.incl(gt)
-          tt[frm].incl(cc.indexOf(gt))
+          tt[frm][s] = cc.indexOf(gt)
     checkSet = new
   doAssert cc.indexOf(init) == 0, "init state is not '0'"
   result = (cc, tt)
@@ -150,4 +154,4 @@ proc filterKernel*[T](cc: SetOfLRItems[T]): SetOfLRItems[T] =
       for itm in itms:
         if itm.pos != 0 or itm.rule.left == start:
           kernelItems.incl(itm)
-      result.incl(kenelItems)
+      result.incl(kernelItems)

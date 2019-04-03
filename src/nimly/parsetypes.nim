@@ -272,5 +272,8 @@ proc calFirsts*[T](g: Grammar[T], symbols: seq[Symbol[T]]): HashSet[Symbol[T]] =
       End:
         result.incl(s)
         return
+      Dummy:
+        result.incl(s)
+        return
       _:
         doAssert false
