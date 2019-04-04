@@ -171,8 +171,7 @@ example
 
 Install
 =======
-1. Clone this repository
-2. ``nimble install``
+1. ``nimble install nimly``
 
 Now, you can use nimly with ``import nimly``.
 
