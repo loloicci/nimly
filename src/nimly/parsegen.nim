@@ -409,7 +409,7 @@ macro nimy*(head, body: untyped): untyped =
     parserName = head[0]
     tokenType = head[1]
     tokenKind = parseStmt($tokenType.ident & "Kind")[0]
-    tableMaker = newIdentNode("makeTableLR")
+    tableMaker = newIdentNode("makeTableLALR")
   var
     nimyInfo = initNimyInfo()
     nonTerms = initSet[string]()

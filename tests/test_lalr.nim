@@ -85,7 +85,7 @@ test "test make LALR kernel":
       check itms.card == 2
     else:
       check itms.card == 1
-  let lalrKernel = g415.toLALRKernel(kernel, tt)
+  let lalrKernel = kernel.toLALRKernel(g415, tt)
   for i, itms in lalrKernel:
     if itms.contains(
       LRItem[string](
