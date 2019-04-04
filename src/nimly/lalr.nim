@@ -154,7 +154,7 @@ proc makeTableLALR*[T](g: Grammar[T]): ParsingTable[T] =
         TermS:
           when defined(nimydebug):
             if actionTable[idx].haskey(sym) and
-               actionTable[idx][sym].kind == ActionTableItemKind.Reset:
+               actionTable[idx][sym].kind == ActionTableItemKind.Reduce:
               echo "LALR:CONFLICT!!!" & $idx & ":" & $sym
           actionTable[idx][sym] = Shift[T](tt[idx][sym])
         NonTermS:
@@ -168,7 +168,7 @@ proc makeTableLALR*[T](g: Grammar[T]): ParsingTable[T] =
               when defined(nimydebug):
                 echo "LALR:CONFLICT!!!" & $idx & ":" & $itm.ahead
               continue
-            actionTable[idx][itm.ahead] = Reset[T](itm.rule)
+            actionTable[idx][itm.ahead] = Reduce[T](itm.rule)
         _:
           discard
   result = ParsingTable[T](action: actionTable, goto: gotoTable)

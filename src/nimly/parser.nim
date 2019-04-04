@@ -11,14 +11,14 @@ type
   State* = int
   ActionTableItemKind* {.pure.} = enum
     Shift
-    Reset
+    Reduce
     Accept
     Error
   ActionTableItem*[T] = object
     case kind*: ActionTableItemKind:
     of ActionTableItemKind.Shift:
       state*: State
-    of ActionTableItemKind.Reset:
+    of ActionTableItemKind.Reduce:
       rule*: Rule[T]
     else:
       discard
@@ -27,8 +27,8 @@ proc `$`*[T](i: ActionTableItem[T]): string =
   match i:
     Shift(state: s):
       return "Shift(" & $s & ")"
-    Reset(rule: r):
-      return "Reset(" & $r & ")"
+    Reduce(rule: r):
+      return "Reduce(" & $r & ")"
     Accept:
       return "Accept"
     Error:
@@ -37,8 +37,8 @@ proc `$`*[T](i: ActionTableItem[T]): string =
 proc Shift*[T](state: State): ActionTableItem[T] =
   return ActionTableItem[T](kind: ActionTableItemKind.Shift, state: state)
 
-proc Reset*[T](rule: Rule[T]): ActionTableItem[T] =
-  return ActionTableItem[T](kind: ActionTableItemKind.Reset, rule: rule)
+proc Reduce*[T](rule: Rule[T]): ActionTableItem[T] =
+  return ActionTableItem[T](kind: ActionTableItemKind.Reduce, rule: rule)
 
 proc Accept*[T](): ActionTableItem[T] =
   return ActionTableItem[T](kind: ActionTableItemKind.Accept)
@@ -101,7 +101,7 @@ proc toConst*[T](pt: ParsingTable[T],
       of ActionTableItemKind.Shift:
         let s = ati.state
         item = s
-      of ActionTableItemKind.Reset:
+      of ActionTableItemKind.Reduce:
         let r = ati.rule
         item = rti[r]
       of ActionTableItemKind.Accept:
@@ -137,7 +137,7 @@ proc reconstruct*[T](cpt: ConstTable,
       if ati == high(int):
         trow[its[id]] = Accept[T]()
       elif ati < 0 and ati != low(int):
-        trow[its[id]] = Reset[T](itr[ati])
+        trow[its[id]] = Reduce[T](itr[ati])
       elif ati > 0:
         trow[its[id]] = Shift[T](ati)
     rat[rid] = trow
@@ -208,7 +208,7 @@ proc parseImpl*[T, S](parser: var Parser[S],
       except:
         raise
       parser.push(s)
-    of ActionTableItemKind.Reset:
+    of ActionTableItemKind.Reduce:
       let r = action.rule
       let reseted = tree[^r.len..^1]
       for i in 0..<r.len:

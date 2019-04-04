@@ -127,7 +127,7 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
           assert i > -1,"There is no 'items' which is equal to 'goto'"
           when defined(nimydebug):
             if actionTable[idx].haskey(sym) and
-              actionTable[idx][sym].kind == ActionTableItemKind.Reset:
+              actionTable[idx][sym].kind == ActionTableItemKind.Reduce:
               echo "LR:CONFLICT!!!" & $idx & ":" & $sym
           actionTable[idx][sym] = Shift[T](i)
         NonTermS:
@@ -145,7 +145,7 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
                   when defined(nimydebug):
                     echo "LR:CONFLICT!!!" & $idx & ":" & $flw
                   continue
-                actionTable[idx][flw] = Reset[T](item.rule)
+                actionTable[idx][flw] = Reduce[T](item.rule)
         _:
           discard
   result = ParsingTable[T](action: actionTable, goto: gotoTable)
