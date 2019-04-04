@@ -63,8 +63,7 @@ Each of followings is recognized as character set.
 
 nimy
 ====
-niml is a LR(0) parser generator work in Nim-lang.
-LALR(1) version is under developing.
+niml is a LALR(1) parser generator work in Nim-lang.
 
 macro nimy
 ----------
