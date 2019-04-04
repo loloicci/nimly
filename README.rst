@@ -3,7 +3,10 @@
 #######
 |azure_pipelines| |nimble|
 
-A lexer generator and the parser generator work in Nim-lang.
+Lexer Generator and Parser Generator as a library in Nim.
+
+Lexer and parser can written in formats like lex and yacc and
+these are generated in compile-time.
 
 niml
 ====
