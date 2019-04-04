@@ -4,13 +4,19 @@ import sets
 
 import patty
 
-import lalr
+import parsetypes
+import parser
 
 type
-  PTProc[T, S, R] = proc(tree: ParseTree[T, S]): R {.nimcall.}
+  PTProc[T, S, R] = proc(nimlytree: ParseTree[T, S]): R {.nimcall.}
   RuleToProc*[T, S, R] = Table[Rule[S], PTProc[T, S, R]]
   # nontermStr -> (retTyNode, ruleToProc id, (clauseNo -> procName))
   NimyInfo = Table[string, (NimNode, NimNode)]
+
+iterator `&`(a, b: NimNode): (int, NimNode) =
+  yield (0, a)
+  for i, val in b:
+    yield (i + 1, val)
 
 proc initNimyInfo(): NimyInfo =
   return initTable[string, (NimNode, NimNode)]()
@@ -189,7 +195,7 @@ proc replaceBody(body, param: NimNode,
 proc makeRuleProc(name, body, rTy, tokenType, tokenKind: NimNode,
                   types: seq[string], nimyInfo: NimyInfo, pt=false): NimNode =
   let
-    param = newIdentNode("tree")
+    param = newIdentNode("nimlytree")
     pTy =   nnkBracketExpr.newTree(newIdentNode("ParseTree"),
                                    tokenType, tokenKind)
     params = @[rTy, nnkIdentDefs.newTree(param, pTy, newEmptyNode())]
@@ -317,7 +323,7 @@ proc addVarIntToSym(stm : var NimNode,
       )
     )
 
-proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
+proc tableMakerProc(name, tokenType, tokenKind, topNonTerm, tableMaker: NimNode,
                     rules, ruleDefs, syms: seq[NimNode]): NimNode =
   var body = nnkStmtList.newTree()
   for rd in ruleDefs:
@@ -370,7 +376,7 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
       tmpTable,
       nnkCall.newTree(
         nnkBracketExpr.newTree(
-          newIdentNode("makeTable"),
+          tableMaker,
           tokenKind
         ),
         grmId
@@ -404,17 +410,23 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm: NimNode,
 macro nimy*(head, body: untyped): untyped =
   head.expectKind(nnkBracketExpr)
   body.expectKind(nnkStmtList)
+  var
+    tableMaker = newIdentNode("makeTableLALR")
   let
     parserName = head[0]
     tokenType = head[1]
     tokenKind = parseStmt($tokenType.ident & "Kind")[0]
+  for i, hd in head:
+    if i > 1:
+      if hd.kind == nnkIdent and $hd == "LR0":
+        tableMaker = newIdentNode("makeTableLR")
   var
     nimyInfo = initNimyInfo()
     nonTerms = initSet[string]()
     terms = initSet[string]()
     first = true
+    topNonTerm: string
     topNonTermNode: NimNode
-    topProcId: NimNode
     returnType: Nimnode
     ruleIds: seq[NimNode] = @[]
     ruleDefs: seq[NimNode] = @[]
@@ -423,6 +435,7 @@ macro nimy*(head, body: untyped): untyped =
     tableConstDefs: seq[NimNode] = @[]
     ruleProcPts: seq[NimNode] = @[]
     symNodes: seq[NimNode] = @[]
+  let topProcId = genSym(nskProc)
   result = newTree(nnkStmtList)
 
   # read BNF first (collert info)
@@ -434,6 +447,7 @@ macro nimy*(head, body: untyped): untyped =
     nonTerms.incl(nonTerm)
     nimyInfo[nonTerm] = (rType, genSym())
     if first:
+      topNonTerm = nonTerm
       topNonTermNode = nnkCall.newTree(
         nnkBracketExpr.newTree(
           newIdentNode("NonTermS"),
@@ -443,10 +457,31 @@ macro nimy*(head, body: untyped): untyped =
       )
       returnType = rType
       first = false
+  nimyInfo["__Start__"] = (returnType, genSym())
 
-  first = true
+  # make top clause proc
+  let topClause = nnkCall.newTree(
+    nnkBracketExpr.newTree(
+      newIdentNode("__Start__"),
+      returnType
+    ),
+    nnkStmtList.newTree(
+      nnkCall.newTree(
+        newIdentNode(topNonTerm),
+        nnkStmtList.newTree(
+          nnkReturnStmt.newTree(
+            nnkPrefix.newTree(
+              newIdentNode("$"),
+              newLit(1)
+            )
+          )
+        )
+      )
+    )
+  )
+
   #read BNF second (make procs)
-  for i, clause in body:
+  for i, clause in topClause & body:
     if clause.kind == nnkCommentStmt:
       continue
     let
@@ -474,10 +509,10 @@ macro nimy*(head, body: untyped): untyped =
           nonTerms, terms, nimyInfo
         )
         ruleId = genSym()
-        ruleProcId = genSym(nskProc)
-      if first:
-        topProcId = ruleProcId
-        first = false
+        ruleProcId = if i == 0:
+                       topProcId
+                     else:
+                       genSym(nskProc)
       ruleIds.add(ruleId)
       let ruleDef = newLetStmt(
         ruleId,
@@ -545,7 +580,7 @@ macro nimy*(head, body: untyped): untyped =
   symNodes.add(
     newCall(
       nnkBracketExpr.newTree(
-        newIdentNode("Nil"),
+        newIdentNode("End"),
         tokenKind
       )
     )
@@ -555,8 +590,8 @@ macro nimy*(head, body: untyped): untyped =
   var
     tableName: NimNode
   result.add(
-    tableMakerProc(tmpName, tokenType, tokenKind, topNonTermNode, ruleIds,
-                   ruleDefs, symNodes)
+    tableMakerProc(tmpName, tokenType, tokenKind, topNonTermNode, tableMaker,
+                   ruleIds, ruleDefs, symNodes)
   )
   var constTableName: NimNode
   when defined(nimylet):
@@ -675,7 +710,7 @@ macro nimy*(head, body: untyped): untyped =
         nnkReturnStmt.newTree(
           nnkCall.newTree(
             topProcId,
-            newIdentNode("tree")
+            newIdentNode("tree"),
           )
         )
       )

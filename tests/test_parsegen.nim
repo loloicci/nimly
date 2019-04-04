@@ -2,11 +2,7 @@ import unittest
 import patty
 import strutils
 
-import nimly/lextypes
-import nimly/lexgen
-import nimly/lexer
-import nimly/lalr
-import nimly/parsegen
+import nimly
 
 type
   MyTokenKind{.pure.} = enum
@@ -71,8 +67,8 @@ test "test 1":
 test "test 2":
   var testLexer = testLex.newWithString("1 + 2 * 3")
   testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
-  testPar.initParser()
+  testPar.init()
   check testPar.parse(testLexer) == "1 + (2 * 3)"
   testLexer.initWithString("1 + 2 * 3")
-  testPar.initParser()
+  testPar.init()
   check testPar.parse(testLexer) == "1 + (2 * 3)"
