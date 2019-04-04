@@ -247,8 +247,11 @@ proc augument*[T](g: Grammar[T]): Grammar[T] =
   let
     start = NonTermS[T]("__Start__")
     startRule = newRule(left = start, right = g.start)
-  assert (not g.rules.contains(startRule)),
-     "`g` is already augument. (the sym '__Start__' can't be used.)"
+  if g.rules.contains(startRule):
+    result = initGrammar(g.rules, start)
+    result.firstTable = result.makeFirstTable
+    result.followTable = result.makeFollowTable
+    return
   var singleStart = initSet[Rule[T]]()
   singleStart.incl(startRule)
   let newRules = g.rules + singleStart

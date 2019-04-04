@@ -125,6 +125,10 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
         TermS:
           let i = canonicalCollection.indexOf(ag.goto(itms, sym))
           assert i > -1,"There is no 'items' which is equal to 'goto'"
+          when defined(nimydebug):
+            if actionTable[idx].haskey(sym) and
+              actionTable[idx][sym].kind == ActionTableItemKind.Reset:
+              echo "LR:CONFLICT!!!" & $idx & ":" & $sym
           actionTable[idx][sym] = Shift[T](i)
         NonTermS:
           let i = canonicalCollection.indexOf(ag.goto(itms, sym))
@@ -138,12 +142,15 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
               if flw.kind == SymbolKind.TermS or flw.kind == SymbolKind.End:
                 if actionTable[idx].haskey(flw) and
                    actionTable[idx][flw].kind == ActionTableItemKind.Shift:
+                  when defined(nimydebug):
+                    echo "LR:CONFLICT!!!" & $idx & ":" & $flw
                   continue
                 actionTable[idx][flw] = Reset[T](item.rule)
         _:
           discard
   result = ParsingTable[T](action: actionTable, goto: gotoTable)
   when defined(nimydebug):
+    echo "LR:"
     echo ag.followTable
     echo canonicalCollection
     echo result

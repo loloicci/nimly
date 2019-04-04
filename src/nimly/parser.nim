@@ -1,4 +1,5 @@
 import tables
+import strutils
 
 import patty
 
@@ -156,7 +157,7 @@ proc `$`*[T, S](pt: ParseTree[T, S], indent: int = 0): string =
     Terminal(token: t):
       result = "  ".repeat(indent) & $t & "\n"
     NonTerminal(rule: r, tree: t):
-      result = "  ".repeat(indent) & "rule: " & $r.right & "\n"
+      result = "  ".repeat(indent) & "rule: " & $r & "\n"
       for n in t:
         result = result & `$`(n, indent + 1)
 
@@ -228,7 +229,7 @@ proc parseImpl*[T, S](parser: var Parser[S],
         else:
           echo tree
       doAssert tree.len == 1, "Error, parsing result is wrong."
-      return tree[0]
+      return NonTerminal[T, S](rule = Rule[S](), tree = tree)
     of ActionTableItemKind.Error:
       doAssert false, "Error, Must be implemented."
   assert false, "Something wrong with parser."
@@ -236,5 +237,5 @@ proc parseImpl*[T, S](parser: var Parser[S],
 proc newParser*[T](t: ParsingTable[T]): Parser[T] =
   result = Parser[T](stack: @[0], table: t)
 
-proc initParser*[T](p: var Parser[T]) =
+proc init*[T](p: var Parser[T]) =
   p.stack = @[0]
