@@ -1,8 +1,8 @@
 #######
  nimly
 #######
-.. image:: https://dev.azure.com/oxisccl/nimly/_apis/build/status/loloiccl.nimly?branchName=master
-    :target: https://dev.azure.com/oxisccl/nimly/_build/latest?definitionId=1&branchName=master
+|azure_pipelines| |nimble|
+
 A lexer generator and the parser generator work in Nim-lang.
 
 niml
@@ -187,3 +187,9 @@ You can use ``nimldebug`` and ``nimydebug`` as a conditional symbol
 to print debug info.
 
 example: ``nim c -d:nimldebug -d:nimydebug -r tests/test_nimly.nim``
+
+
+.. |azure_pipelines| image:: https://dev.azure.com/oxisccl/nimly/_apis/build/status/loloiccl.nimly?branchName=master
+    :target: https://dev.azure.com/oxisccl/nimly/_build/latest?definitionId=1&branchName=master
+.. |nimble| image:: https://raw.githubusercontent.com/yglukhov/nimble-tag/master/nimble.png
+    :target: https://github.com/yglukhov/nimble-tag
