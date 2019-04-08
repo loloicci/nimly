@@ -63,10 +63,21 @@ proc convertToSymNode(name: string, kindTy: NimNode,
     )
 
 proc convertToSymNode(node, kindTy: NimNode,
-                      nonTerms: HashSet[string]): NimNode =
-  node.expectKind(nnkIdent)
-  let name = $(node.ident)
-  return convertToSymNode(name, kindTy, nonTerms)
+                      nonTerms: HashSet[string],
+                      noEmpty: bool = true): NimNode =
+  node.expectKind({nnkIdent, nnkBracket})
+  if node.kind == nnkBracket:
+    doAssert node.len == 0 and (not (noEmpty)), "rule cannot empty or" &
+      " contains [] if the rule is not empty"
+    return nnkCall.newTree(
+      nnkBracketExpr.newTree(
+        newIdentNode("Empty"),
+        kindTy
+      )
+    )
+  else:
+    let name = $(node.ident)
+    return convertToSymNode(name, kindTy, nonTerms)
 
 proc newRuleMakerNode(kindTy, left: NimNode,
                       right: varargs[NimNode]): NimNode =
@@ -81,11 +92,22 @@ proc newRuleMakerNode(kindTy, left: NimNode,
     result.add(node)
 
 proc nonTermOrEmpty(node: NimNode, nonTerms: HashSet[string]): string =
+  node.expectKind({nnkBracket, nnkIdent})
+  if node.kind == nnkBracket:
+    return ""
   let s = $(node.ident)
   if s in nonTerms:
     result = s
   else:
     result = ""
+
+proc isTerm(node: NimNode, nonTerms: HashSet[string]): bool =
+  node.expectKind({nnkBracket, nnkIdent})
+  if node.kind == nnkBracket:
+    return false
+  elif not ($(node.ident) in nonTerms):
+    return true
+  return false
 
 proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
                       nonTerms: HashSet[string], terms: var HashSet[string],
@@ -96,9 +118,9 @@ proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
   case node.kind:
   of nnkCall:
     let
-      rightNode = node[0].convertToSymNode(kindTy, nonTerms)
+      rightNode = node[0].convertToSymNode(kindTy, nonTerms, noEmpty = false)
       ruleMaker = newRuleMakerNode(kindTy, left, rightNode)
-    if not ($(node[0].ident) in nonTerms):
+    if node[0].isTerm(nonTerms):
       terms.incl($(node[0].ident))
     # types.add(getTypeNode(node[0], nonTerms, nimyInfo))
     types.add(node[0].nonTermOrEmpty(nonTerms))
@@ -108,13 +130,13 @@ proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
       right: seq[NimNode] = @[]
       cmd: NimNode = node
     while cmd.kind == nnkCommand:
-      if not ($(cmd[0].ident) in nonTerms):
+      if cmd[0].isTerm(nonTerms):
         terms.incl($(cmd[0].ident))
       right.add(cmd[0].convertToSymNode(kindTy, nonTerms))
       # types.add(cmd[0].getTypeNode(nonTerms, nimyInfo))
       types.add(cmd[0].nonTermOrEmpty(nonTerms))
       cmd = cmd[1]
-    if not ($(cmd.ident) in nonTerms):
+    if cmd.isTerm(nonTerms):
       terms.incl($(cmd.ident))
     right.add(cmd.convertToSymNode(kindTy, nonTerms))
     # types.add(cmd.getTypeNode(nonTerms, nimyInfo))

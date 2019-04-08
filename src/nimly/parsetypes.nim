@@ -92,6 +92,12 @@ proc hash*[T](x: Rule[T]): Hash =
   h = h !& hash(x.right)
   return !$h
 
+proc lenWithoutEmpty*[T](r: Rule[T]): int =
+  result = 0
+  for s in r.right:
+    if s != Empty[T]():
+      inc(result)
+
 proc `[]`[T](os: OrderedSet[T], idx: int): T {.inline.} =
   if os.len <= idx:
     raise newException(IndexError, "idx is too large.")
@@ -171,6 +177,8 @@ proc makeFirstTable[T](g: Grammar[T]): FirstTable[T] =
         result[s] = initSet
       TermS:
         result[s] = [s].toSet
+      Empty:
+        result[s] = [s].toSet
       _:
         doAssert false, "There is a non-symbol in rules."
 
@@ -220,6 +228,8 @@ proc makeFollowTable[T](g: Grammar[T]): FollowTable[T] =
             # renew meta data
             fEmpTail = false
             firstSyms = [sym].toSet
+          Empty:
+            discard
           NonTermS:
             # renew first table
             for f in firstSyms:

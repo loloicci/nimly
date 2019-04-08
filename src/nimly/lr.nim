@@ -37,6 +37,14 @@ proc next*[T](i: LRItem[T]): Symbol[T] =
     return End[T]()
   result = i.rule.right[i.pos]
 
+proc nextSkipEmpty*[T](i: LRItem[T]): Symbol[T] =
+  result = End[T]()
+  for idx in i.pos..<i.rule.len:
+    let nxt = i.rule.right[idx]
+    if nxt != Empty[T]():
+      result = nxt
+      break
+
 proc pointForward*[T](i: LRItem[T]): LRItem[T] =
   doAssert i.pos < i.rule.len
   result = LRItem[T](rule: i.rule, pos: i.pos + 1)
@@ -120,7 +128,7 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
     actionTable[idx] = initTable[Symbol[T], ActionTableItem[T]]()
     gotoTable[idx] = initTable[Symbol[T], State]()
     for item in itms:
-      let sym = item.next
+      let sym = item.nextSkipEmpty
       match sym:
         TermS:
           let i = canonicalCollection.indexOf(ag.goto(itms, sym))
@@ -147,6 +155,8 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
                   continue
                 actionTable[idx][flw] = Reduce[T](item.rule)
         _:
+          when defined(nimy_debug):
+            echo "LR: OTHER (" & $sym & ")"
           discard
   result = ParsingTable[T](action: actionTable, goto: gotoTable)
   when defined(nimydebug):

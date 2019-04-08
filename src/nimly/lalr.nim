@@ -38,6 +38,14 @@ proc next*[T](i: LALRItem[T]): Symbol[T] =
     return End[T]()
   result = i.rule.right[i.pos]
 
+proc nextSkipEmpty*[T](i: LALRItem[T]): Symbol[T] =
+  result = End[T]()
+  for idx in i.pos..<i.rule.len:
+    let nxt = i.rule.right[idx]
+    if nxt != Empty[T]():
+      result = nxt
+      break
+
 proc fromNextNext*[T](i: LALRItem[T]): seq[Symbol[T]] =
   doAssert i.pos < i.rule.len
   result = @[]
@@ -149,7 +157,7 @@ proc makeTableLALR*[T](g: Grammar[T]): ParsingTable[T] =
     actionTable[idx] = initTable[Symbol[T], ActionTableItem[T]]()
     gotoTable[idx] = initTable[Symbol[T], State]()
     for itm in ag.closure(itms):
-      let sym = itm.next
+      let sym = itm.nextSkipEmpty
       match sym:
         TermS:
           when defined(nimydebug):
