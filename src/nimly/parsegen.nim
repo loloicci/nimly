@@ -44,8 +44,8 @@ proc genKindNode(kindTy, kind: NimNode): NimNode =
   )
 
 proc convertToSymNode(name: string, kindTy: NimNode,
-                      nonTerms: HashSet[string]): NimNode =
-  if name in nonTerms:
+                      nimyInfo: NimyInfo): NimNode =
+  if nimyInfo.haskey(name):
     result = nnkCall.newTree(
       nnkBracketExpr.newTree(
         newIdentNode("NonTermS"),
@@ -63,7 +63,7 @@ proc convertToSymNode(name: string, kindTy: NimNode,
     )
 
 proc convertToSymNode(node, kindTy: NimNode,
-                      nonTerms: HashSet[string],
+                      nimyInfo: NimyInfo,
                       noEmpty: bool = true): NimNode =
   node.expectKind({nnkIdent, nnkBracket})
   if node.kind == nnkBracket:
@@ -77,7 +77,7 @@ proc convertToSymNode(node, kindTy: NimNode,
     )
   else:
     let name = $(node.ident)
-    return convertToSymNode(name, kindTy, nonTerms)
+    return convertToSymNode(name, kindTy, nimyInfo)
 
 proc newRuleMakerNode(kindTy, left: NimNode,
                       right: varargs[NimNode]): NimNode =
@@ -91,26 +91,26 @@ proc newRuleMakerNode(kindTy, left: NimNode,
   for node in right:
     result.add(node)
 
-proc nonTermOrEmpty(node: NimNode, nonTerms: HashSet[string]): string =
+proc nonTermOrEmpty(node: NimNode, nimyInfo: NimyInfo): string =
   node.expectKind({nnkBracket, nnkIdent})
   if node.kind == nnkBracket:
     return ""
   let s = $(node.ident)
-  if s in nonTerms:
+  if nimyInfo.haskey(s):
     result = s
   else:
     result = ""
 
-proc isTerm(node: NimNode, nonTerms: HashSet[string]): bool =
+proc isTerm(node: NimNode, nimyInfo: NimyInfo): bool =
   node.expectKind({nnkBracket, nnkIdent})
   if node.kind == nnkBracket:
     return false
-  elif not ($(node.ident) in nonTerms):
+  elif not (nimyInfo.haskey($(node.ident))):
     return true
   return false
 
 proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
-                      nonTerms: HashSet[string], terms: var HashSet[string],
+                      terms: var HashSet[string],
                       nimyInfo: NimyInfo): (
                         NimNode, seq[string], NimNode) =
   node.expectKind({nnkCall, nnkCommand})
@@ -118,29 +118,26 @@ proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
   case node.kind:
   of nnkCall:
     let
-      rightNode = node[0].convertToSymNode(kindTy, nonTerms, noEmpty = false)
+      rightNode = node[0].convertToSymNode(kindTy, nimyInfo, noEmpty = false)
       ruleMaker = newRuleMakerNode(kindTy, left, rightNode)
-    if node[0].isTerm(nonTerms):
+    if node[0].isTerm(nimyInfo):
       terms.incl($(node[0].ident))
-    # types.add(getTypeNode(node[0], nonTerms, nimyInfo))
-    types.add(node[0].nonTermOrEmpty(nonTerms))
+    types.add(node[0].nonTermOrEmpty(nimyInfo))
     result = (ruleMaker, types, node[1])
   of nnkCommand:
     var
       right: seq[NimNode] = @[]
       cmd: NimNode = node
     while cmd.kind == nnkCommand:
-      if cmd[0].isTerm(nonTerms):
+      if cmd[0].isTerm(nimyInfo):
         terms.incl($(cmd[0].ident))
-      right.add(cmd[0].convertToSymNode(kindTy, nonTerms))
-      # types.add(cmd[0].getTypeNode(nonTerms, nimyInfo))
-      types.add(cmd[0].nonTermOrEmpty(nonTerms))
+      right.add(cmd[0].convertToSymNode(kindTy, nimyInfo))
+      types.add(cmd[0].nonTermOrEmpty(nimyInfo))
       cmd = cmd[1]
-    if cmd.isTerm(nonTerms):
+    if cmd.isTerm(nimyInfo):
       terms.incl($(cmd.ident))
-    right.add(cmd.convertToSymNode(kindTy, nonTerms))
-    # types.add(cmd.getTypeNode(nonTerms, nimyInfo))
-    types.add(cmd.nonTermOrEmpty(nonTerms))
+    right.add(cmd.convertToSymNode(kindTy, nimyInfo))
+    types.add(cmd.nonTermOrEmpty(nimyInfo))
 
     let ruleMaker = newRuleMakerNode(kindTy, left, right)
     result = (ruleMaker, types, node[2])
@@ -444,7 +441,6 @@ macro nimy*(head, body: untyped): untyped =
         tableMaker = newIdentNode("makeTableLR")
   var
     nimyInfo = initNimyInfo()
-    nonTerms = initSet[string]()
     terms = initSet[string]()
     first = true
     topNonTerm: string
@@ -465,8 +461,7 @@ macro nimy*(head, body: untyped): untyped =
     if clause.kind == nnkCommentStmt:
       continue
     let (nonTerm, rType) = parseLeft(clause)
-    doAssert (not (nonTerm in nonTerms)), "some nonterm are duplicated"
-    nonTerms.incl(nonTerm)
+    doAssert (not (nimyInfo.haskey(nonTerm))), "some nonterm are duplicated"
     nimyInfo[nonTerm] = (rType, genSym())
     if first:
       topNonTerm = nonTerm
@@ -528,7 +523,7 @@ macro nimy*(head, body: untyped): untyped =
         # argTypes: seq[bool] (true if nonterm)
         (ruleMaker, argTypes, clauseBody) = parseRuleAndBody(
           ruleClause, tokenKind, tokenType, left,
-          nonTerms, terms, nimyInfo
+          terms, nimyInfo
         )
         ruleId = genSym()
         ruleProcId = if i == 0:
@@ -597,8 +592,10 @@ macro nimy*(head, body: untyped): untyped =
   result.add(tableConstDefs)
   result.add(ruleProcs)
   # makeGrammarAndParsingTable
-  for nt in nonTerms + terms:
-    symNodes.add(convertToSymNode(nt, tokenKind, nonTerms))
+  for nt in nimyInfo.keys:
+    symNodes.add(convertToSymNode(nt, tokenKind, nimyInfo))
+  for t in terms:
+    symNodes.add(convertToSymNode(t, tokenKind, nimyInfo))
   symNodes.add(
     newCall(
       nnkBracketExpr.newTree(
