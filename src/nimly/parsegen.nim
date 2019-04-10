@@ -21,10 +21,16 @@ type
     repRule: NimNode
   NimyInfo = Table[string, NimyRow]
 
-iterator `&`(a, b: NimNode): (int, NimNode) =
-  yield (0, a)
-  for i, val in b:
-    yield (i + 1, val)
+iterator iter(a, b: NimNode, c: seq[NimNode]): (int, NimNode) =
+  var cnt = 0
+  yield (cnt, a)
+  inc(cnt)
+  for val in b:
+    yield (cnt, val)
+    inc(cnt)
+  for val in c:
+    yield (cnt, val)
+    inc(cnt)
 
 proc initNimyRow(kind: NimyKind,
                  rtn: NimNode = newEmptyNode(),
@@ -34,10 +40,15 @@ proc initNimyRow(kind: NimyKind,
   result = NimyRow(kind: kind, retTyNode: rtn, ruleToProc: rtp, optRule: opr,
                    repRule: rpr)
 
-proc isNonTerm(nimyInfo: NimyInfo, s: string): bool =
+proc isNonTerm(s: string, nimyInfo: NimyInfo): bool =
   if not nimyInfo.haskey(s):
     return false
   return nimyInfo[s].kind == NonTerm
+
+proc isTerm(s: string, nimyInfo: NimyInfo): bool =
+  if not nimyInfo.haskey(s):
+    return false
+  return  nimyInfo[s].kind == Term
 
 proc initNimyInfo(): NimyInfo =
   return initTable[string, NimyRow]()
@@ -66,7 +77,7 @@ proc genKindNode(kindTy, kind: NimNode): NimNode =
 
 proc convertToSymNode(name: string, kindTy: NimNode,
                       nimyInfo: NimyInfo): NimNode =
-  if nimyInfo.isNonTerm(name):
+  if name.isNonTerm(nimyInfo):
     result = nnkCall.newTree(
       nnkBracketExpr.newTree(
         newIdentNode("NonTermS"),
@@ -74,7 +85,7 @@ proc convertToSymNode(name: string, kindTy: NimNode,
       ),
       newStrLitNode(name)
     )
-  else:
+  elif name.isTerm(nimyInfo):
     result = nnkCall.newTree(
       nnkBracketExpr.newTree(
         newIdentNode("TermS"),
@@ -82,12 +93,35 @@ proc convertToSymNode(name: string, kindTy: NimNode,
       ),
       genKindNode(kindTy, newIdentNode(name))
     )
+  else:
+    doAssert false
 
 proc convertToSymNode(node, kindTy: NimNode,
                       nimyInfo: NimyInfo,
                       noEmpty: bool = true): NimNode =
-  node.expectKind({nnkIdent, nnkBracket})
-  if node.kind == nnkBracket:
+  node.expectKind({nnkIdent, nnkBracket, nnkBracketExpr, nnkCurlyExpr})
+  case node.kind
+  of nnkBracketExpr:
+    doAssert node.len == 1
+    let innerSym = $node[0].ident
+    return nnkCall.newTree(
+      nnkBracketExpr.newTree(
+        newIdentNode("NonTermS"),
+        kindTy
+      ),
+      newStrLitNode($nimyInfo[innerSym].optRule.ident)
+    )
+  of nnkCurlyExpr:
+    doAssert node.len == 1
+    let innerSym = $node[0].ident
+    return nnkCall.newTree(
+      nnkBracketExpr.newTree(
+        newIdentNode("NonTermS"),
+        kindTy
+      ),
+      newStrLitNode($nimyInfo[innerSym].repRule.ident)
+    )
+  of nnkBracket:
     doAssert node.len == 0 and (not (noEmpty)), "rule cannot empty or" &
       " contains [] if the rule is not empty"
     return nnkCall.newTree(
@@ -96,9 +130,11 @@ proc convertToSymNode(node, kindTy: NimNode,
         kindTy
       )
     )
-  else:
+  of nnkIdent:
     let name = $(node.ident)
     return convertToSymNode(name, kindTy, nimyInfo)
+  else:
+    doAssert false
 
 proc newRuleMakerNode(kindTy, left: NimNode,
                       right: varargs[NimNode]): NimNode =
@@ -113,20 +149,28 @@ proc newRuleMakerNode(kindTy, left: NimNode,
     result.add(node)
 
 proc nonTermOrEmpty(node: NimNode, nimyInfo: NimyInfo): string =
-  node.expectKind({nnkBracket, nnkIdent})
-  if node.kind == nnkBracket:
+  node.expectKind({nnkBracket, nnkIdent, nnkBracketExpr, nnkCurlyExpr})
+  case node.kind
+  of nnkBracket:
     return ""
-  let s = $(node.ident)
-  if nimyInfo.isNonTerm(s):
-    result = s
+  of nnkBracketExpr:
+    assert node.len == 1
+    return $nimyInfo[$node[0].ident].optRule.ident
+  of nnkCurlyExpr:
+    assert node.len == 1
+    return $nimyInfo[$node[0].ident].repRule.ident
   else:
-    result = ""
+    let s = $(node.ident)
+    if s.isNonTerm(nimyInfo):
+      result = s
+    else:
+      result = ""
 
 proc isTerm(node: NimNode, nimyInfo: NimyInfo): bool =
-  node.expectKind({nnkBracket, nnkIdent})
-  if node.kind == nnkBracket:
+  node.expectKind({nnkBracket, nnkIdent, nnkBracketExpr, nnkCurlyExpr})
+  if node.kind in {nnkBracket, nnkBracketExpr, nnkCurlyExpr}:
     return false
-  elif not (nimyInfo.isNonTerm($(node.ident))):
+  elif not (($node.ident).isNonTerm(nimyInfo)):
     return true
   return false
 
@@ -164,8 +208,6 @@ proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
     doAssert false
 
   for sym in node.ruleRight:
-    if sym.isTerm(nimyInfo) and not(nimyInfo.haskey($sym.ident)):
-      nimyInfo[$sym.ident] = initNimyRow(Term)
     right.add(sym.convertToSymNode(kindTy, nimyInfo, noEmpty))
     types.add(sym.nonTermOrEmpty(nimyInfo))
   let ruleMaker = newRuleMakerNode(kindTy, left, right)
@@ -369,7 +411,8 @@ proc addVarIntToSym(stm : var NimNode,
       )
     )
 
-proc tableMakerProc(name, tokenType, tokenKind, topNonTerm, tableMaker: NimNode,
+proc tableMakerProc(name, tokenType, tokenKind, topNonTerm,
+                    tableMaker: NimNode,
                     rules, ruleDefs, syms: seq[NimNode]): NimNode =
   var body = nnkStmtList.newTree()
   for rd in ruleDefs:
@@ -453,6 +496,140 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm, tableMaker: NimNode,
     body
   )
 
+proc getOpt(sym, ty, nt: NimNode): NimNode =
+  result = nnkCall.newTree(
+    nnkBracketExpr.newTree(
+      nt,
+      nnkBracketExpr.newTree(
+        newIdentNode("seq"),
+        ty
+      )
+    ),
+    nnkStmtList.newTree(
+      nnkCall.newTree(
+        sym,
+        nnkStmtList.newTree(
+          nnkReturnStmt.newTree(
+            nnkPrefix.newTree(
+              newIdentNode("@"),
+              nnkBracket.newTree(
+                nnkPrefix.newTree(
+                  newIdentNode("$"),
+                  newLit(1)
+                )
+              )
+            )
+          )
+        )
+      ),
+      nnkCall.newTree(
+        nnkBracket.newTree(
+        ),
+        nnkStmtList.newTree(
+          nnkReturnStmt.newTree(
+            nnkPrefix.newTree(
+              newIdentNode("@"),
+              nnkBracket.newTree(
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+
+proc getRepOpt(sym, ty, nt: NimNode): NimNode =
+  result = nnkCall.newTree(
+    nnkBracketExpr.newTree(
+      nt,
+      nnkBracketExpr.newTree(
+        newIdentNode("seq"),
+        ty
+      )
+    ),
+    nnkStmtList.newTree(
+      nnkCall.newTree(
+        sym,
+        nnkStmtList.newTree(
+          nnkReturnStmt.newTree(
+            nnkPrefix.newTree(
+              newIdentNode("$"),
+              newLit(1)
+            )
+          )
+        )
+      ),
+      nnkCall.newTree(
+        nnkBracket.newTree(
+        ),
+        nnkStmtList.newTree(
+          nnkReturnStmt.newTree(
+            nnkPrefix.newTree(
+              newIdentNode("@"),
+              nnkBracket.newTree(
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+
+proc getRep(sym, ty, nt, nnt: NimNode): seq[NimNode] =
+  result = @[]
+  result.add(getRepOpt(nnt, ty, nt))
+  let new = nnkCall.newTree(
+    nnkBracketExpr.newTree(
+      nnt,
+      nnkBracketExpr.newTree(
+        newIdentNode("seq"),
+        ty
+      )
+    ),
+    nnkStmtList.newTree(
+      nnkCommand.newTree(
+        nnt,
+        sym,
+        nnkStmtList.newTree(
+          nnkAsgn.newTree(
+            newIdentNode("result"),
+            nnkPrefix.newTree(
+              newIdentNode("$"),
+              newLit(1)
+            )
+          ),
+          nnkCall.newTree(
+            nnkDotExpr.newTree(
+              newIdentNode("result"),
+              newIdentNode("add")
+            ),
+            nnkPrefix.newTree(
+              newIdentNode("$"),
+              newLit(2)
+            )
+          )
+        )
+      ),
+      nnkCall.newTree(
+        sym,
+        nnkStmtList.newTree(
+          nnkReturnStmt.newTree(
+            nnkPrefix.newTree(
+              newIdentNode("@"),
+              nnkBracket.newTree(
+                nnkPrefix.newTree(
+                  newIdentNode("$"),
+                  newLit(1)
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+  result.add(new)
+
 macro nimy*(head, body: untyped): untyped =
   head.expectKind(nnkBracketExpr)
   body.expectKind(nnkStmtList)
@@ -503,6 +680,83 @@ macro nimy*(head, body: untyped): untyped =
   nimyInfo["__Start__"] = initNimyRow(NonTerm,
                                       rtn = returnType, rtp = genSym())
 
+  # make opt and rep
+  var optAndRep: seq[NimNode] = @[]
+  for clause in body:
+    if clause.kind == nnkCommentStmt:
+      continue
+    for ruleClause in clause[1]:
+      for sym in ruleClause.ruleRight:
+        if sym.isTerm(nimyInfo) and not(nimyInfo.haskey($sym.ident)):
+          nimyInfo[$sym.ident] = initNimyRow(Term)
+        if not (sym.kind in {nnkBracketExpr, nnkCurlyExpr}):
+          continue
+        doAssert sym.len == 1
+        let innerSym = $sym[0].ident
+        if sym[0].isTerm(nimyInfo) and
+           not(nimyInfo.haskey(innersym)):
+          nimyInfo[innerSym] = initNimyRow(Term)
+        case sym.kind
+        of nnkBracketExpr:
+          if nimyInfo[innerSym].optRule.kind != nnkEmpty:
+            continue
+          let
+            newStr = "__opt_" & innerSym
+            new = newIdentNode(newStr)
+            ty = if innerSym.isNonTerm(nimyInfo):
+                   nimyInfo[innerSym].retTyNode
+                 else:
+                   tokenType
+            rt = nnkBracketExpr.newTree(
+              newIdentNode("seq"),
+              ty
+            )
+            nr = nimyInfo[innerSym]
+
+          optAndRep.add(getOpt(newIdentNode(innerSym), ty, new))
+          nimyInfo[newStr] = initNimyRow(NonTerm, rtn = rt, rtp = genSym())
+          nimyInfo[innerSym] = NimyRow(
+            kind: nr.kind,
+            retTyNode: nr.retTyNode,
+            ruleToProc: nr.ruleToProc,
+            optRule: new,
+            repRule: nr.repRule
+            )
+
+        of nnkCurlyExpr:
+          if nimyInfo[innerSym].optRule.kind != nnkEmpty:
+            continue
+          let
+            newStr = "__rep_" & innerSym
+            new = newIdentNode(newStr)
+            newInnerStr = "__inner_" & newStr
+            newInner = newIdentNode(newInnerStr)
+            ty = if innerSym.isNonTerm(nimyInfo):
+                   nimyInfo[innerSym].retTyNode
+                 else:
+                   tokenType
+            rt = nnkBracketExpr.newTree(
+              newIdentNode("seq"),
+              ty
+            )
+            nr = nimyInfo[innerSym]
+
+          optAndRep.add(getRep(newIdentNode(innerSym), ty, new, newInner))
+          nimyInfo[newStr] = initNimyRow(NonTerm, rtn = rt,
+                                         rtp = genSym())
+          nimyInfo[newInnerStr] = initNimyRow(NonTerm, rtn = rt,
+                                              rtp = genSym())
+          nimyInfo[innerSym] = NimyRow(
+            kind: nr.kind,
+            retTyNode: nr.retTyNode,
+            ruleToProc: nr.ruleToProc,
+            optRule: nr.optRule,
+            repRule: new
+            )
+
+        else:
+          discard
+
   # make top clause proc
   let topClause = nnkCall.newTree(
     nnkBracketExpr.newTree(
@@ -525,7 +779,7 @@ macro nimy*(head, body: untyped): untyped =
   )
 
   # read BNF second (make procs)
-  for i, clause in topClause & body:
+  for i, clause in iter(topClause, body, optAndRep):
     if clause.kind == nnkCommentStmt:
       continue
     let
@@ -547,7 +801,7 @@ macro nimy*(head, body: untyped): untyped =
           ),
           newStrLitNode(nonTerm)
         )
-        # argTypes: seq[bool] (true if nonterm)
+        # argTypes: seq[string] (name if nonterm)
         (ruleMaker, argTypes, clauseBody) = parseRuleAndBody(
           ruleClause, tokenKind, tokenType, left, nimyInfo
         )
@@ -626,6 +880,14 @@ macro nimy*(head, body: untyped): untyped =
     newCall(
       nnkBracketExpr.newTree(
         newIdentNode("End"),
+        tokenKind
+      )
+    )
+  )
+  symNodes.add(
+    newCall(
+      nnkBracketExpr.newTree(
+        newIdentNode("Empty"),
         tokenKind
       )
     )
