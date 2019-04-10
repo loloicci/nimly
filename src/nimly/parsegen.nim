@@ -516,7 +516,7 @@ macro nimy*(head, body: untyped): untyped =
     )
   )
 
-  #read BNF second (make procs)
+  # read BNF second (make procs)
   for i, clause in topClause & body:
     if clause.kind == nnkCommentStmt:
       continue
@@ -605,10 +605,12 @@ macro nimy*(head, body: untyped): untyped =
         )
       )
     )
+
   result.add(ruleProcPts)
   result.add(ruleToProcMakers)
   result.add(tableConstDefs)
   result.add(ruleProcs)
+
   # makeGrammarAndParsingTable
   for nt in nimyInfo.keys:
     symNodes.add(convertToSymNode(nt, tokenKind, nimyInfo))
