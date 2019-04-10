@@ -106,10 +106,10 @@ Example is as follows.
 
 You can use following EBNF functions:
 
-- `XXX[]`: Option (0 or 1 `XXX`).
-  The type is `seq[xxx]` where `xxx` is type of `XXX`.
-- `XXX{}`: Repeat (0 or more `XXX`).
-  The type is `seq[xxx]` where `xxx` is type of `XXX`.
+- ``XXX[]``: Option (0 or 1 ``XXX``).
+  The type is ``seq[xxx]`` where ``xxx`` is type of ``XXX``.
+- ``XXX{}``: Repeat (0 or more ``XXX``).
+  The type is ``seq[xxx]`` where ``xxx`` is type of ``XXX``.
 
 Example of these is in next section.
 
