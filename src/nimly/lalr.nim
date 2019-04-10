@@ -47,8 +47,8 @@ proc nextSkipEmpty*[T](i: LALRItem[T]): Symbol[T] =
       break
 
 proc fromNextNext*[T](i: LALRItem[T]): seq[Symbol[T]] =
-  doAssert i.pos < i.rule.len
   result = @[]
+  doAssert i.pos < i.rule.len
   for index in (i.pos + 1)..<i.rule.len:
     result.add(i.rule.right[index])
 

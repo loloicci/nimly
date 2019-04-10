@@ -130,39 +130,46 @@ proc isTerm(node: NimNode, nimyInfo: NimyInfo): bool =
     return true
   return false
 
+iterator ruleRight(node: NimNode): NimNode =
+  case node.kind
+  of nnkCall:
+    yield node[0]
+  of nnkCommand:
+    var nd = node
+    while nd.kind == nnkCommand:
+      yield nd[0]
+      nd = nd[1]
+    yield nd
+  else:
+    assert false
+
 proc parseRuleAndBody(node, kindTy, tokenType, left: NimNode,
                       nimyInfo: var NimyInfo): (
                         NimNode, seq[string], NimNode) =
   node.expectKind({nnkCall, nnkCommand})
-  var types: seq[string] = @[]
+  var
+    right: seq[NimNode] = @[]
+    types: seq[string] = @[]
+    body: NimNode
+    noEmpty: bool
+
   case node.kind:
   of nnkCall:
-    let
-      rightNode = node[0].convertToSymNode(kindTy, nimyInfo, noEmpty = false)
-      ruleMaker = newRuleMakerNode(kindTy, left, rightNode)
-    if node[0].isTerm(nimyInfo) and not(nimyInfo.haskey($(node[0].ident))):
-      nimyInfo[$(node[0].ident)] = initNimyRow(Term)
-    types.add(node[0].nonTermOrEmpty(nimyInfo))
-    result = (ruleMaker, types, node[1])
+    body = node[1]
+    noEmpty = false
   of nnkCommand:
-    var
-      right: seq[NimNode] = @[]
-      cmd: NimNode = node
-    while cmd.kind == nnkCommand:
-      if cmd[0].isTerm(nimyInfo) and not(nimyInfo.haskey($(cmd[0].ident))):
-        nimyInfo[$(cmd[0].ident)] = initNimyRow(Term)
-      right.add(cmd[0].convertToSymNode(kindTy, nimyInfo))
-      types.add(cmd[0].nonTermOrEmpty(nimyInfo))
-      cmd = cmd[1]
-    if cmd.isTerm(nimyInfo) and not(nimyInfo.haskey($(cmd.ident))):
-      nimyInfo[$(cmd.ident)] = initNimyRow(Term)
-    right.add(cmd.convertToSymNode(kindTy, nimyInfo))
-    types.add(cmd.nonTermOrEmpty(nimyInfo))
-
-    let ruleMaker = newRuleMakerNode(kindTy, left, right)
-    result = (ruleMaker, types, node[2])
+    body = node[2]
+    noEmpty = true
   else:
     doAssert false
+
+  for sym in node.ruleRight:
+    if sym.isTerm(nimyInfo) and not(nimyInfo.haskey($sym.ident)):
+      nimyInfo[$sym.ident] = initNimyRow(Term)
+    right.add(sym.convertToSymNode(kindTy, nimyInfo, noEmpty))
+    types.add(sym.nonTermOrEmpty(nimyInfo))
+  let ruleMaker = newRuleMakerNode(kindTy, left, right)
+  result = (ruleMaker, types, body)
 
 proc parseLeft(clause: NimNode): (string, NimNode) =
   clause.expectKind(nnkCall)
@@ -493,7 +500,8 @@ macro nimy*(head, body: untyped): untyped =
       )
       returnType = rType
       first = false
-  nimyInfo["__Start__"] = initNimyRow(NonTerm, rtn = returnType, rtp = genSym())
+  nimyInfo["__Start__"] = initNimyRow(NonTerm,
+                                      rtn = returnType, rtp = genSym())
 
   # make top clause proc
   let topClause = nnkCall.newTree(
