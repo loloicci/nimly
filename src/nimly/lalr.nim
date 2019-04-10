@@ -110,6 +110,7 @@ proc toLALRKernel[T](lrKernel: SetOfLRItems[T], g: Grammar[T],
 
   # init collection and cal propagate
   for idx, itms in lrKernel:
+    echo "[nimly] converting kernel: " & $(idx + 1) & "/" & $lrKernel.len
     for itm in itms:
       if not (propagation.haskey(itm)):
         propagation[itm] = initSet[(int, LRItem[T])]()
@@ -145,6 +146,7 @@ proc makeTableLALR*[T](g: Grammar[T]): ParsingTable[T] =
     gotoTable: GotoTable[T]
   actionTable = initTable[State, ActionRow[T]]()
   gotoTable = initTable[State, GotoRow[T]]()
+  echo "[nimly] start: make table for parser"
   let
     ag = if g.isAugument:
            g
@@ -153,10 +155,18 @@ proc makeTableLALR*[T](g: Grammar[T]): ParsingTable[T] =
     (cc, tt) = makeCanonicalCollection[T](ag)
     knl = cc.filterKernel
     lalrKnl = knl.toLALRKernel(ag, tt)
+  echo "[nimly] done: make lalrkernel"
   for idx, itms in lalrKnl:
+    echo "[nimly] processing: Collection " & $(idx + 1) & "/" & $lalrKnl.len
     actionTable[idx] = initTable[Symbol[T], ActionTableItem[T]]()
     gotoTable[idx] = initTable[Symbol[T], State]()
-    for itm in ag.closure(itms):
+    echo "[nimly] processing: Collection " & $(idx + 1) & " - make closure"
+    let clsr = ag.closure(itms)
+    var cnt = 1
+    for itm in clsr:
+      echo "[nimly] processing: Collection " & $(idx + 1) & " - " &
+        $cnt & "/" & $clsr.card
+      inc(cnt)
       let sym = itm.nextSkipEmpty
       match sym:
         TermS:
@@ -179,6 +189,7 @@ proc makeTableLALR*[T](g: Grammar[T]): ParsingTable[T] =
             actionTable[idx][itm.ahead] = Reduce[T](itm.rule)
         _:
           discard
+  echo "[nimly] done: make tables"
   result = ParsingTable[T](action: actionTable, goto: gotoTable)
   when defined(nimydebug):
     echo "LALR:"
