@@ -104,6 +104,15 @@ Example is as follows.
       expr PLUS expr
         return $2
 
+You can use following EBNF functions:
+
+- `XXX[]`: Option (0 or 1 `XXX`).
+  The type is `seq[xxx]` where `xxx` is type of `XXX`.
+- `XXX{}`: Repeat (0 or more `XXX`).
+  The type is `seq[xxx]` where `xxx` is type of `XXX`.
+
+Example of these is in next section.
+
 example
 =======
 ``tests/test_nimly.nim`` is an easy example.
@@ -120,6 +129,7 @@ example
     PLUS
     MULTI
     NUM(val: int)
+    DOT
     IGNORE
 
   niml testLex[MyToken]:
@@ -127,8 +137,10 @@ example
       return PLUS()
     r"\*":
       return MULTI()
-    r"\d*":
+    r"\d":
       return NUM(parseInt(token.token))
+    r"\.":
+      return DOT()
     r"\s":
       return IGNORE()
 
@@ -147,27 +159,43 @@ example
       num:
         return $1
     num[string]:
-      NUM:
-        return $(($1).val)
+      NUM DOT[] NUM{}:
+        result = ""
+        result.add(($1).val)
+        if ($2).len > 0:
+          result.add(".")
+        for tkn in $3:
+          result.add(tkn.val)
 
   test "test 1":
-    var testLexer = testLex.newWithString("1 + 2 * 3")
+    var testLexer = testLex.newWithString("1 + 42 * 101010")
     testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
     var
       ret: seq[MyTokenKind] = @[]
     for token in testLexer.lexIter:
       ret.add(token.kind)
     check ret == @[MyTokenKind.NUM, MyTokenKind.PLUS, MyTokenKind.NUM,
-                   MyTokenKind.MULTI, MyTokenKind.NUM]
+                   MyTokenKind.NUM, MyTokenKind.MULTI,
+                   MyTokenKind.NUM, MyTokenKind.NUM, MyTokenKind.NUM,
+                   MyTokenKind.NUM, MyTokenKind.NUM, MyTokenKind.NUM]
 
   test "test 2":
-    var testLexer = testLex.newWithString("1 + 2 * 3")
+    var testLexer = testLex.newWithString("1 + 42 * 101010")
     testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
-    testPar.initParser()
-    check testPar.parse(testLexer) == "1 + (2 * 3)"
-    testLexer.initWithString("1 + 2 * 3")
-    testPar.initParser()
-    check testPar.parse(testLexer) == "1 + (2 * 3)"
+    testPar.init()
+    check testPar.parse(testLexer) == "1 + (42 * 101010)"
+    testLexer.initWithString("1 + 42 * 1010")
+    testPar.init()
+    check testPar.parse(testLexer) == "1 + (42 * 1010)"
+
+  test "test 2":
+    var testLexer = testLex.newWithString("1 + 42 * 1.01010")
+    testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
+    testPar.init()
+    check testPar.parse(testLexer) == "1 + (42 * 1.01010)"
+    testLexer.initWithString("1. + 4.2 * 101010")
+    testPar.init()
+    check testPar.parse(testLexer) == "1. + (4.2 * 101010)"
 
 Install
 =======
