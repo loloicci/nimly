@@ -210,14 +210,19 @@ proc parseImpl*[T, S](parser: var Parser[S],
       parser.push(s)
     of ActionTableItemKind.Reduce:
       let r = action.rule
-      let reseted = tree[^r.len..^1]
-      for i in 0..<r.len:
+      let reseted = tree[^r.lenWithoutEmpty..^1]
+      for i in 0..<r.lenWithoutEmpty:
         discard parser.pop
         discard tree.pop
       tree.add(NonTerminal[T, S](r, reseted))
       try:
         parser.push(parser.table.goto[parser.top][r.left])
       except KeyError:
+        when defined(nimydebug):
+          echo "Parser:"
+          echo parser
+          echo "left:"
+          echo r.left
         let msg = "Nimy Internal Error (goto key error)"
         raise newException(NimyGotoError, msg)
       except:

@@ -31,7 +31,7 @@ niml testLex[string]:
   r"\s":
     return ""
 
-test "test macro nimly (if/else)":
+test "test macro niml (if/else)":
   var testLexer = testLex.newWithString("""if
 else if
 else""")

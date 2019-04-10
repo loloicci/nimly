@@ -113,6 +113,7 @@ when not defined(release):
 
 proc accPos*(t: ReSynTree): seq[Pos] =
   ## use it if acc is only one position
+  result = @[]
   when defined(release):
     result = t.accPosImpl
   else:
@@ -262,6 +263,7 @@ proc makeFollowposTable(t: ReSynTree): Pos2PosSet =
       result.mergeSetTable(c[].makeFollowposTable)
 
 proc terms(t: ReSynTree): seq[Lit] =
+  result = @[]
   match t:
     Term(lit: l):
       return @[l]
@@ -291,6 +293,8 @@ proc makeCharPossetTable(t: ReSynTree): TableRef[char, HashSet[Pos]] =
         continue
 
 proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
+  echo "[nimly] start : make DFA"
+
   let
     t = lr.st
     followpos = t.makeFollowposTable
@@ -344,6 +348,7 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
     if mp != high(int):
       accepts[posS2DState[k]] = (lr.accPosProc[mp])
 
+  echo "[nimly] done : make DFA"
   # make DFA
   return DFA[T](start: iState, accepts: accepts,
                 stateNum: stateNum, tran: tran)
@@ -440,6 +445,7 @@ proc minimizeStates[T](input: DFA[T],
 
 proc minimizeStates*[T](input: DFA[T]): DFA[T] =
   ## needs all accepts correspond unique clause
+  echo "[nimly] start : minimize lexer state"
   var
     initPart: seq[HashSet[DState]] = @[]
     other = initSet[DState]()
@@ -458,6 +464,7 @@ proc minimizeStates*[T](input: DFA[T]): DFA[T] =
     echo "--------"
 
   result = input.minimizeStates(initPart)
+  echo "[nimly] done : minimize lexer state"
 
 proc defaultAndOther(dtr: DTranRow): (DState, DTranRow) =
   var counts = newTable[DState, int]()
@@ -537,6 +544,7 @@ proc writeRow(ncTable: var NCTable, index: int, nc: NC, force = false) =
     ncTable[index] = nc
 
 proc convertToLexData*[T](dfa: DFA[T]): LexData[T] =
+  echo "[nimly] start : make lexer table"
   var
     # first element is starting state
     dbaTable: DBATable[T] = @[DBA[T]()]
@@ -584,7 +592,7 @@ proc convertToLexData*[T](dfa: DFA[T]): LexData[T] =
                          check = v[0]),
                        force = true)
 
-
+  echo "[nimly] done : make lexer table"
   return LexData[T](dba: dbaTable, nc: ncTable)
 
 proc nextState*[T](ld: LexData[T], s: State, a: char): State =
@@ -888,6 +896,23 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
     lexerMakerBody = newStmtList()
     procs: seq[NimNode] = @[]
 
+  lexerMakerBody.add(
+    nnkWhenStmt.newTree(
+      nnkElifBranch.newTree(
+        nnkCall.newTree(
+          newIdentNode("defined"),
+          newIdentNode("nimlydebug")
+        ),
+        nnkStmtList.newTree(
+          nnkCommand.newTree(
+            newIdentNode("echo"),
+            newLit("START: makeing the lexer")
+          )
+        )
+      )
+    )
+  )
+
   # init part
 
   # var app = newAccPosProc[T]()
@@ -1148,6 +1173,23 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
         nnkCall.newTree(
           newIdentNode("convertToLexData"),
           minimizedDfa
+        )
+      )
+    )
+  )
+
+  lexerMakerBody.add(
+    nnkWhenStmt.newTree(
+      nnkElifBranch.newTree(
+        nnkCall.newTree(
+          newIdentNode("defined"),
+          newIdentNode("nimlydebug")
+        ),
+        nnkStmtList.newTree(
+          nnkCommand.newTree(
+            newIdentNode("echo"),
+            newLit("END: makeing the lexer")
+          )
         )
       )
     )
