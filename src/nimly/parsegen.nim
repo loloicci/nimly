@@ -415,6 +415,22 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm,
                     tableMaker: NimNode,
                     rules, ruleDefs, syms: seq[NimNode]): NimNode =
   var body = nnkStmtList.newTree()
+  body.add(
+    nnkWhenStmt.newTree(
+      nnkElifBranch.newTree(
+        nnkCall.newTree(
+          newIdentNode("defined"),
+          newIdentNode("nimlydebug")
+        ),
+        nnkStmtList.newTree(
+          nnkCommand.newTree(
+            newIdentNode("echo"),
+            newLit("START: makeing the Parser")
+          )
+        )
+      )
+    )
+  )
   for rd in ruleDefs:
     body.add(rd)
   let
@@ -490,6 +506,24 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm,
       )
     )
   )
+
+  body.add(
+    nnkWhenStmt.newTree(
+      nnkElifBranch.newTree(
+        nnkCall.newTree(
+          newIdentNode("defined"),
+          newIdentNode("nimlydebug")
+        ),
+        nnkStmtList.newTree(
+          nnkCommand.newTree(
+            newIdentNode("echo"),
+            newLit("END: makeing the Parser")
+          )
+        )
+      )
+    )
+  )
+
   result = newProc(
     name,
     @[newIdentNode("ConstTable")],

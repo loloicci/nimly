@@ -113,6 +113,7 @@ when not defined(release):
 
 proc accPos*(t: ReSynTree): seq[Pos] =
   ## use it if acc is only one position
+  result = @[]
   when defined(release):
     result = t.accPosImpl
   else:
@@ -262,6 +263,7 @@ proc makeFollowposTable(t: ReSynTree): Pos2PosSet =
       result.mergeSetTable(c[].makeFollowposTable)
 
 proc terms(t: ReSynTree): seq[Lit] =
+  result = @[]
   match t:
     Term(lit: l):
       return @[l]
@@ -888,6 +890,23 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
     lexerMakerBody = newStmtList()
     procs: seq[NimNode] = @[]
 
+  lexerMakerBody.add(
+    nnkWhenStmt.newTree(
+      nnkElifBranch.newTree(
+        nnkCall.newTree(
+          newIdentNode("defined"),
+          newIdentNode("nimlydebug")
+        ),
+        nnkStmtList.newTree(
+          nnkCommand.newTree(
+            newIdentNode("echo"),
+            newLit("START: makeing the lexer")
+          )
+        )
+      )
+    )
+  )
+
   # init part
 
   # var app = newAccPosProc[T]()
@@ -1148,6 +1167,23 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
         nnkCall.newTree(
           newIdentNode("convertToLexData"),
           minimizedDfa
+        )
+      )
+    )
+  )
+
+  lexerMakerBody.add(
+    nnkWhenStmt.newTree(
+      nnkElifBranch.newTree(
+        nnkCall.newTree(
+          newIdentNode("defined"),
+          newIdentNode("nimlydebug")
+        ),
+        nnkStmtList.newTree(
+          nnkCommand.newTree(
+            newIdentNode("echo"),
+            newLit("END: makeing the lexer")
+          )
         )
       )
     )
