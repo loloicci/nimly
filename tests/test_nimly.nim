@@ -4,6 +4,7 @@ import strutils
 
 import nimly
 
+## variant is defined in patty
 variant MyToken:
   PLUS
   MULTI
@@ -28,16 +29,17 @@ nimy testPar[MyToken]:
     plus:
       return $1
   plus[string]:
-    plus PLUS plus:
+    mult PLUS plus:
       return $1 & " + " & $3
     mult:
       return $1
   mult[string]:
-    mult MULTI mult:
+    num MULTI mult:
       return "(" & $1 & " * " & $3 & ")"
     num:
       return $1
   num[string]:
+    ## float (integer part is 0-9) or integer
     NUM DOT[] NUM{}:
       result = ""
       result.add(($1).val)
@@ -46,7 +48,7 @@ nimy testPar[MyToken]:
       for tkn in $3:
         result.add(tkn.val)
 
-test "test 1":
+test "test Lexer":
   var testLexer = testLex.newWithString("1 + 42 * 101010")
   testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
   var
@@ -58,7 +60,7 @@ test "test 1":
                  MyTokenKind.NUM, MyTokenKind.NUM, MyTokenKind.NUM,
                  MyTokenKind.NUM, MyTokenKind.NUM, MyTokenKind.NUM]
 
-test "test 2":
+test "test Parser 1":
   var testLexer = testLex.newWithString("1 + 42 * 101010")
   testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
   testPar.init()
@@ -67,7 +69,7 @@ test "test 2":
   testPar.init()
   check testPar.parse(testLexer) == "1 + (42 * 1010)"
 
-test "test 2":
+test "test Parser 2":
   var testLexer = testLex.newWithString("1 + 42 * 1.01010")
   testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
   testPar.init()
@@ -75,4 +77,3 @@ test "test 2":
   testLexer.initWithString("1. + 4.2 * 101010")
   testPar.init()
   check testPar.parse(testLexer) == "1. + (4.2 * 101010)"
-

@@ -720,6 +720,8 @@ macro nimy*(head, body: untyped): untyped =
     if clause.kind == nnkCommentStmt:
       continue
     for ruleClause in clause[1]:
+      if ruleClause.kind == nnkCommentStmt:
+        continue
       for sym in ruleClause.ruleRight:
         if sym.isTerm(nimyInfo) and not(nimyInfo.haskey($sym.ident)):
           nimyInfo[$sym.ident] = initNimyRow(Term)
