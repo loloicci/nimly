@@ -4,7 +4,7 @@ import strutils
 
 import nimly
 
-## variant is function of patty
+## variant is defined in patty
 variant MyToken:
   PLUS
   MULTI
