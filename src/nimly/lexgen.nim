@@ -68,45 +68,45 @@ proc newDTranRow(): DTranRow =
 
 proc accPosImplDebug(t: ReSynTree): seq[Pos] =
   result = @[]
-  match t:
-    Term(lit: l):
-      match l:
-        Empty:
-          return @[]
-        Char(pos: p, c: c):
-          if c.kind == LCharKind.End:
-            result &= p
-          else:
-            return @[]
-    Star(child: c):
-      result = result & c[].accPosImplDebug
-    Bin(op:_, left: l, right: r):
-      result = result & r[].accPosImplDebug
-      result = result & l[].accPosImplDebug
+  var checkSet: seq[ReSynTree] = @[t]
+  while checkSet.len > 0:
+    let ct = checkSet.pop
+    match ct:
+      Term(lit: l):
+        match l:
+          Empty:
+            continue
+          Char(pos: p, c: c):
+            if c.kind == LCharKind.End:
+              result &= p
+            else:
+              continue
+      Star(child: c):
+        checkSet.add(c[])
+      Bin(op:_, left: l, right: r):
+        checkSet.add(r[])
+        checkSet.add(l[])
 
 proc accPosImpl(t: ReSynTree): seq[Pos] =
   result = @[]
-  match t:
-    Term(lit: l):
-      match l:
-        Empty:
-          return @[]
-        Char(pos: p, c: c):
-          if c.kind == LCharKind.End:
-            return @[p]
-          else:
+  var checkSet: seq[ReSynTree] = @[t]
+  while checkSet.len > 0:
+    let ct = checkSet.pop
+    match ct:
+      Term(lit: l):
+        match l:
+          Empty:
             return @[]
-    Star(child: c):
-      result = c[].accPosImpl
-      if result.len > 0:
-        return
-    Bin(op:_, left: l, right: r):
-      result = r[].accPosImpl
-      if result.len > 0:
-        return
-      result = l[].accPosImpl
-      if result.len > 0:
-        return
+          Char(pos: p, c: c):
+            if c.kind == LCharKind.End:
+              return @[p]
+            else:
+              return @[]
+      Star(child: c):
+        checkSet = @[c[]] & checkSet
+      Bin(op:_, left: l, right: r):
+        checkSet = @[r[]] & checkSet
+        checkSet = @[l[]] & checkSet
 
 when not defined(release):
   import sequtils
@@ -143,39 +143,44 @@ proc reassignPos(t: ReSynTree, nextPos: var int): ReSynTree =
 proc collectPos(t: ReSynTree): HashSet[Pos] =
   # error on tree with not unique positions when debug
   result.init
-  match t:
-    Term(lit: l):
-      match l:
-        Empty:
-          return
-        Char(pos: p, c: _):
-          result.incl(p)
-          return
-    Bin(op: _, left: l, right: r):
-      let
-        lr = l[].collectPos
-        rr = r[].collectPos
-      assert (lr * rr).len == 0
-      return lr + rr
-    Star(child: c):
-      return c[].collectPos
+  var checkSet: seq[ReSynTree] = @[t]
+  while checkSet.len > 0:
+    var ct = checkSet.pop
+    match ct:
+      Term(lit: l):
+        match l:
+          Empty:
+            continue
+          Char(pos: p, c: _):
+            result.incl(p)
+            continue
+      Bin(op: _, left: l, right: r):
+        checkSet.add(l[])
+        checkSet.add(r[])
+      Star(child: c):
+        checkSet.add(c[])
 
 proc collectChar(t: ReSynTree): set[char] =
-  match t:
-    Term(lit: l):
-      match l:
-        Empty:
-          return {}
-        Char(pos: p, c: lc):
-          match lc:
-            End:
-              return
-            Real(c: c):
-              return {c}
-    Bin(op: _, left: l, right: r):
-      return l[].collectChar + r[].collectChar
-    Star(child: c):
-      return c[].collectChar
+  result = {}
+  var checkSet: seq[ReSynTree] = @[t]
+  while checkSet.len > 0:
+    let ct = checkSet.pop
+    match ct:
+      Term(lit: l):
+        match l:
+          Empty:
+            continue
+          Char(pos: p, c: lc):
+            match lc:
+              End:
+                continue
+              Real(c: c):
+                result.incl(c)
+      Bin(op: _, left: l, right: r):
+        checkSet.add(l[])
+        checkSet.add(r[])
+      Star(child: c):
+        checkSet.add(c[])
 
 proc nullable(t: ReSynTree): bool =
   match t:
@@ -196,47 +201,53 @@ proc nullable(t: ReSynTree): bool =
 
 proc firstpos(t: ReSynTree): HashSet[Pos] =
   result.init
-  match t:
-    Term(lit: l):
-      match l:
-        Empty:
-          return
-        Char(pos: p, c: _):
-          result.incl(p)
-          return
-    Bin(op: o, left: l, right: r):
-      case o
-      of bor:
-        return l[].firstpos + r[].firstpos
-      of bcat:
-        if l[].nullable:
-          return l[].firstpos + r[].firstpos
-        else:
-          return l[].firstpos
-    Star(child: c):
-      return c[].firstpos
+  var checkSet: seq[ReSynTree] = @[t]
+  while checkSet.len > 0:
+    let ct = checkSet.pop
+    match ct:
+      Term(lit: l):
+        match l:
+          Empty:
+            continue
+          Char(pos: p, c: _):
+            result.incl(p)
+            continue
+      Bin(op: o, left: l, right: r):
+        case o
+        of bor:
+          checkSet.add(l[])
+          checkSet.add(r[])
+        of bcat:
+          checkSet.add(l[])
+          if l[].nullable:
+            checkSet.add(r[])
+      Star(child: c):
+        checkSet.add(c[])
 
 proc lastpos(t: ReSynTree): HashSet[Pos] =
   result.init
-  match t:
-    Term(lit: l):
-      match l:
-        Empty:
-          return
-        Char(pos: p, c: _):
-          result.incl(p)
-          return
-    Bin(op: o, left: l, right: r):
-      case o
-      of bor:
-        return l[].lastpos + r[].lastpos
-      of bcat:
-        if r[].nullable:
-          return l[].lastpos + r[].lastpos
-        else:
-          return r[].lastpos
-    Star(child: c):
-      return c[].lastpos
+  var checkSet: seq[ReSynTree] = @[t]
+  while checkSet.len > 0:
+    let ct = checkSet.pop
+    match ct:
+      Term(lit: l):
+        match l:
+          Empty:
+            continue
+          Char(pos: p, c: _):
+            result.incl(p)
+            continue
+      Bin(op: o, left: l, right: r):
+        case o
+        of bor:
+          checkSet.add(l[])
+          checkSet.add(r[])
+        of bcat:
+          if r[].nullable:
+            checkSet.add(l[])
+          checkSet.add(r[])
+      Star(child: c):
+        checkSet.add(c[])
 
 proc mergeSetTable[A; B](a: var TableRef[A, HashSet[B]],
                          b: TableRef[A, HashSet[B]]) =
@@ -246,31 +257,44 @@ proc mergeSetTable[A; B](a: var TableRef[A, HashSet[B]],
 proc makeFollowposTable(t: ReSynTree): Pos2PosSet =
   # init
   result = newPos2PosSet()
+  var checkSet: seq[ReSynTree] = @[t]
 
-  # make
-  match t:
-    Term:
-      return
-    Bin(op: o, left: l, right: r):
-      if o == bcat:
-        for i in l[].lastpos:
-          result[i] = r[].firstpos
-      result.mergeSetTable(l[].makeFollowposTable)
-      result.mergeSetTable(r[].makeFollowposTable)
-    Star(child: c):
-      for i in t.lastpos:
-        result[i] = t.firstpos
-      result.mergeSetTable(c[].makeFollowposTable)
+  while checkSet.len > 0:
+    let ct = checkSet.pop
+    # make
+    match ct:
+      Term:
+        continue
+      Bin(op: o, left: l, right: r):
+        if o == bcat:
+          for i in l[].lastpos:
+            if result.hasKey(i):
+              result[i] = result[i] + r[].firstpos
+            else:
+              result[i] = r[].firstpos
+        checkSet.add(l[])
+        checkSet.add(r[])
+      Star(child: c):
+        for i in ct.lastpos:
+          if result.haskey(i):
+            result[i] = result[i] + ct.firstpos
+          else:
+            result[i] = ct.firstpos
+        checkSet.add(c[])
 
 proc terms(t: ReSynTree): seq[Lit] =
   result = @[]
-  match t:
-    Term(lit: l):
-      return @[l]
-    Bin(op: _, left: l, right: r):
-      return l[].terms & r[].terms
-    Star(child: c):
-      return c[].terms
+  var checkSet: seq[ReSynTree] = @[t]
+  while checkSet.len > 0:
+    let ct = checkSet.pop
+    match ct:
+      Term(lit: l):
+        result.add(l)
+      Bin(op: _, left: l, right: r):
+        checkSet.add(l[])
+        checkSet.add(r[])
+      Star(child: c):
+        checkSet.add(c[])
 
 proc makeCharPossetTable(t: ReSynTree): TableRef[char, HashSet[Pos]] =
   # init
