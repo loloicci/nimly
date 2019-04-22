@@ -26,9 +26,15 @@ Example
     MULTI
     NUM(val: int)
     DOT
+    LPAREN
+    RPAREN
     IGNORE
 
   niml testLex[MyToken]:
+    r"\(":
+      return LPAREN()
+    r"\)":
+      return RPAREN()
     r"\+":
       return PLUS()
     r"\*":
@@ -51,10 +57,12 @@ Example
         return $1
     mult[string]:
       num MULTI mult:
-        return "(" & $1 & " * " & $3 & ")"
+        return "[" & $1 & " * " & $3 & "]"
       num:
         return $1
     num[string]:
+      LPAREN plus RPAREN:
+        return "(" & $2 & ")"
       ## float (integer part is 0-9) or integer
       NUM DOT[] NUM{}:
         result = ""
@@ -80,19 +88,25 @@ Example
     var testLexer = testLex.newWithString("1 + 42 * 101010")
     testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
     testPar.init()
-    check testPar.parse(testLexer) == "1 + (42 * 101010)"
+    check testPar.parse(testLexer) == "1 + [42 * 101010]"
     testLexer.initWithString("1 + 42 * 1010")
     testPar.init()
-    check testPar.parse(testLexer) == "1 + (42 * 1010)"
+    check testPar.parse(testLexer) == "1 + [42 * 1010]"
 
   test "test Parser 2":
     var testLexer = testLex.newWithString("1 + 42 * 1.01010")
     testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
     testPar.init()
-    check testPar.parse(testLexer) == "1 + (42 * 1.01010)"
+    check testPar.parse(testLexer) == "1 + [42 * 1.01010]"
     testLexer.initWithString("1. + 4.2 * 101010")
     testPar.init()
-    check testPar.parse(testLexer) == "1. + (4.2 * 101010)"
+    check testPar.parse(testLexer) == "1. + [4.2 * 101010]"
+
+  test "test Parser 3":
+    var testLexer = testLex.newWithString("(1 + 42) * 1.01010")
+    testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
+    testPar.init()
+    check testPar.parse(testLexer) == "[(1 + 42) * 1.01010]"
 
 
 niml
