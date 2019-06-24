@@ -174,7 +174,7 @@ niml is a LALR(1) parser generator work in Nim-lang.
 macro nimy
 ----------
 macro nimy makes a parser.
-Almost all part of constructing a parser is done in comile-time.
+Almost all part of constructing a parser is done in compile-time.
 Example is as follows.
 
 .. code-block:: nim
