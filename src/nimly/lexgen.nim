@@ -140,26 +140,6 @@ proc reassignPos(t: ReSynTree, nextPos: var int): ReSynTree =
     Star(child: c):
       return Star(child = ~c[].reassignPos(nextPos))
 
-proc collectPos(t: ReSynTree): HashSet[Pos] =
-  # error on tree with not unique positions when debug
-  result.init
-  var checkSet: seq[ReSynTree] = @[t]
-  while checkSet.len > 0:
-    var ct = checkSet.pop
-    match ct:
-      Term(lit: l):
-        match l:
-          Empty:
-            continue
-          Char(pos: p, c: _):
-            result.incl(p)
-            continue
-      Bin(op: _, left: l, right: r):
-        checkSet.add(l[])
-        checkSet.add(r[])
-      Star(child: c):
-        checkSet.add(c[])
-
 proc collectChar(t: ReSynTree): set[char] =
   result = {}
   var checkSet: seq[ReSynTree] = @[t]
@@ -170,7 +150,7 @@ proc collectChar(t: ReSynTree): set[char] =
         match l:
           Empty:
             continue
-          Char(pos: p, c: lc):
+          Char(pos: _, c: lc):
             match lc:
               End:
                 continue
@@ -249,11 +229,6 @@ proc lastpos(t: ReSynTree): HashSet[Pos] =
       Star(child: c):
         checkSet.add(c[])
 
-proc mergeSetTable[A; B](a: var TableRef[A, HashSet[B]],
-                         b: TableRef[A, HashSet[B]]) =
-  for k in b.keys:
-    a[k] = a.getOrDefault(k, initSet[B]()) + b[k]
-
 proc makeFollowposTable(t: ReSynTree): Pos2PosSet =
   # init
   result = newPos2PosSet()
@@ -303,7 +278,7 @@ proc makeCharPossetTable(t: ReSynTree): TableRef[char, HashSet[Pos]] =
 
   result = newTable[char, HashSet[Pos]]()
   for c in chars:
-    result[c] = initSet[Pos]()
+    result[c] = initHashSet[Pos]()
 
   for l in t.terms:
     match l:
@@ -347,7 +322,7 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
     tran[s] = newDTranRow()
     for c in chars:
       let posSet = ps * charPosset[c]
-      var newSPos: HashSet[Pos] = initSet[Pos]()
+      var newSPos: HashSet[Pos] = initHashSet[Pos]()
       for p in posSet:
         newSPos = newSPos + followpos[p]
       var nState: DState
@@ -398,13 +373,13 @@ proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
       for i, sp in subparts:
         let (sos, tran) = sp
         if sTran == tran:
-          var single = initSet[DState]()
+          var single = initHashSet[DState]()
           single.incl(state)
           subparts[i] = (sos + single, tran)
           isNewPart = false
           break
       if isNewPart:
-        var single = initSet[DState]()
+        var single = initHashSet[DState]()
         single.incl(state)
         subparts.add((single, sTran))
 
@@ -416,7 +391,7 @@ proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
   parts = retParts
 
 proc removeDead[T](input: DFA[T]): DFA[T] =
-  var dead = initSet[DState]()
+  var dead = initHashSet[DState]()
   for s, tr in input.tran:
     if input.accepts.haskey(s):
       continue
@@ -472,12 +447,12 @@ proc minimizeStates*[T](input: DFA[T]): DFA[T] =
   echo "[nimly] start : minimize lexer state"
   var
     initPart: seq[HashSet[DState]] = @[]
-    other = initSet[DState]()
+    other = initHashSet[DState]()
   for i in 0..<input.stateNum:
     other.incl(i)
 
   for k in input.accepts.keys:
-    var single = initSet[DState]()
+    var single = initHashSet[DState]()
     single.incl(k)
     other.excl(k)
     initPart.add(single)
@@ -662,7 +637,7 @@ const
   readingClass = int8(0)
   readingEscape = int8(1)
   readingDot = int8(2)
-  classHead = int8(3)
+  # classHead = int8(3)
   readingBraceS = int8(4)
   readingBraceE = int8(5)
   readingClassRange = int8(6)
@@ -846,7 +821,7 @@ proc handleQuantifier(input: seq[RePart]): seq[RePart] =
   var bfr = input[0]
   for i, rp in input[1..(input.len - 1)]:
     match rp:
-      RChar(c: c):
+      RChar(c: _):
         if bfr.kind in {RePartKind.RChar, RePartKind.Tree}:
           result.add(bfr)
       Special(sc: c):
@@ -869,7 +844,7 @@ proc handleQuantifier(input: seq[RePart]): seq[RePart] =
         doassert (bfr.kind != RePartKind.Special and
                   bfr.kind != RePartKind.Brace), "invalid quantifier"
         result.add(Tree(tree = bfr.treeBrace(s, e)))
-      Tree(tree: t):
+      Tree(tree: _):
         if bfr.kind in {RePartKind.RChar, RePartKind.Tree}:
           result.add(bfr)
     bfr = rp
@@ -1013,7 +988,6 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
     clause[0].expectKind({nnkRStrLit, nnkStrLit})
     clause[1].expectKind(nnkStmtList)
     let
-      reStr = clause[0].strVal
       param = newTree(nnkIdentDefs,
                       newIdentNode("token"),
                       newIdentNode("LToken"),
@@ -1225,7 +1199,7 @@ macro niml*(name, body: untyped): untyped =
   name.expectKind(nnkBracketExpr)
   body.expectKind(nnkStmtList)
   let
-    nameStr = $name[0].ident
+    nameStr = name[0].strVal
     typeId = name[1]
   result = newStmtList()
 

@@ -69,11 +69,11 @@ proc closure[T](g: Grammar[T], whole: LRItems[T]): LRItems[T] =
 proc goto[T](g: Grammar[T], itms: LRItems[T], s: Symbol[T]): LRItems[T] =
   doAssert s.kind != SymbolKind.End
   assert itms == g.closure(itms)
-  var gotoSet = initSet[LRItem[T]]()
+  var gotoHashSet = initHashSet[LRItem[T]]()
   for i in itms:
     if i.next == s:
-      gotoSet.incl(i.pointForward)
-  result = g.closure(gotoSet)
+      gotoHashSet.incl(i.pointForward)
+  result = g.closure(gotoHashSet)
 
 proc hash*[T](x: LRItem[T]): Hash =
   var h: Hash = 0
@@ -83,7 +83,7 @@ proc hash*[T](x: LRItem[T]): Hash =
 
 proc makeCanonicalCollection*[T](g: Grammar[T]): (SetOfLRItems[T],
                                                   TransTable[T]) =
-  let init = g.closure([LRItem[T](rule: g.startRule, pos: 0)].toSet)
+  let init = g.closure([LRItem[T](rule: g.startRule, pos: 0)].toHashSet)
   var
     cc = [
       init
@@ -97,7 +97,7 @@ proc makeCanonicalCollection*[T](g: Grammar[T]): (SetOfLRItems[T],
     for itms in checkSet:
       let frm = cc.indexOf(itms)
       assert itms == g.closure(itms)
-      var done = initSet[Symbol[T]]()
+      var done = initHashSet[Symbol[T]]()
       done.incl(End[T]())
       for i in itms:
         let s = i.next
@@ -123,7 +123,7 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
            g
          else:
            g.augument
-    (canonicalCollection, tt) = makeCanonicalCollection[T](ag)
+    (canonicalCollection, _) = makeCanonicalCollection[T](ag)
   for idx, itms in canonicalCollection:
     actionTable[idx] = initTable[Symbol[T], ActionTableItem[T]]()
     gotoTable[idx] = initTable[Symbol[T], State]()
@@ -170,7 +170,7 @@ proc filterKernel*[T](cc: SetOfLRItems[T]): SetOfLRItems[T] =
   let start = NonTermS[T]("__Start__")
   for i, itms in cc:
     for itm in itms:
-      var kernelItems = initSet[LRItem[T]]()
+      var kernelItems = initHashSet[LRItem[T]]()
       for itm in itms:
         if itm.pos != 0 or itm.rule.left == start:
           kernelItems.incl(itm)

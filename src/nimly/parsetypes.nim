@@ -124,7 +124,7 @@ proc initGrammar*[T](rules: HashSet[Rule[T]], start: Symbol[T]): Grammar[T] =
 
 proc initGrammar*[T](rules: openArray[Rule[T]],
                      start: Symbol[T]): Grammar[T] =
-  result = initGrammar(rules.toSet, start)
+  result = initGrammar(rules.toHashSet, start)
 
 proc filterRulesLeftIs*[T](g: Grammar[T], x: Symbol[T]): seq[Rule[T]] =
   result = @[]
@@ -172,13 +172,13 @@ proc makeFirstTable[T](g: Grammar[T]): FirstTable[T] =
   for s in g.symbolSet:
     match s:
       NonTermS:
-        var initSet: HashSet[Symbol[T]]
-        initSet.init()
-        result[s] = initSet
+        var initHashSet: HashSet[Symbol[T]]
+        initHashSet.init()
+        result[s] = initHashSet
       TermS:
-        result[s] = [s].toSet
+        result[s] = [s].toHashSet
       Empty:
-        result[s] = [s].toSet
+        result[s] = [s].toHashSet
       _:
         doAssert false, "There is a non-symbol in rules."
 
@@ -192,7 +192,7 @@ proc makeFirstTable[T](g: Grammar[T]): FirstTable[T] =
     for r in g.rules:
       var fEmp = true
       for s in r.right:
-        let newFst = result[r.left] + (result[s] - [Empty[T]()].toSet)
+        let newFst = result[r.left] + (result[s] - [Empty[T]()].toHashSet)
         if result[r.left] != newFst:
           fCnt = true
         result[r.left] = newFst
@@ -207,9 +207,9 @@ proc makeFollowTable[T](g: Grammar[T]): FollowTable[T] =
   doAssert g.firstTable.len != 0, "firstTable is nill."
   result = initTable[Symbol[T], HashSet[Symbol[T]]]()
   for s in g.nonTermSymbolSet:
-    var initSet: HashSet[Symbol[T]]
-    initSet.init()
-    result[s] = initSet
+    var initHashSet: HashSet[Symbol[T]]
+    initHashSet.init()
+    result[s] = initHashSet
   result[g.start].incl(End[T]())
   var fCnt = true
   while fCnt:
@@ -227,7 +227,7 @@ proc makeFollowTable[T](g: Grammar[T]): FollowTable[T] =
           TermS:
             # renew meta data
             fEmpTail = false
-            firstSyms = [sym].toSet
+            firstSyms = [sym].toHashSet
           Empty:
             discard
           NonTermS:
@@ -262,7 +262,7 @@ proc augument*[T](g: Grammar[T]): Grammar[T] =
     result.firstTable = result.makeFirstTable
     result.followTable = result.makeFollowTable
     return
-  var singleStart = initSet[Rule[T]]()
+  var singleStart = initHashSet[Rule[T]]()
   singleStart.incl(startRule)
   let newRules = g.rules + singleStart
   result = initGrammar(newRules, start)
