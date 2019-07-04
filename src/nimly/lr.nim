@@ -123,7 +123,7 @@ proc makeTableLR*[T](g: Grammar[T]): ParsingTable[T] =
            g
          else:
            g.augument
-    (canonicalCollection, tt) = makeCanonicalCollection[T](ag)
+    (canonicalCollection, _) = makeCanonicalCollection[T](ag)
   for idx, itms in canonicalCollection:
     actionTable[idx] = initTable[Symbol[T], ActionTableItem[T]]()
     gotoTable[idx] = initTable[Symbol[T], State]()

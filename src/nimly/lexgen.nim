@@ -140,26 +140,6 @@ proc reassignPos(t: ReSynTree, nextPos: var int): ReSynTree =
     Star(child: c):
       return Star(child = ~c[].reassignPos(nextPos))
 
-proc collectPos(t: ReSynTree): HashSet[Pos] =
-  # error on tree with not unique positions when debug
-  result.init
-  var checkSet: seq[ReSynTree] = @[t]
-  while checkSet.len > 0:
-    var ct = checkSet.pop
-    match ct:
-      Term(lit: l):
-        match l:
-          Empty:
-            continue
-          Char(pos: p, c: _):
-            result.incl(p)
-            continue
-      Bin(op: _, left: l, right: r):
-        checkSet.add(l[])
-        checkSet.add(r[])
-      Star(child: c):
-        checkSet.add(c[])
-
 proc collectChar(t: ReSynTree): set[char] =
   result = {}
   var checkSet: seq[ReSynTree] = @[t]
@@ -248,11 +228,6 @@ proc lastpos(t: ReSynTree): HashSet[Pos] =
           checkSet.add(r[])
       Star(child: c):
         checkSet.add(c[])
-
-proc mergeSetTable[A; B](a: var TableRef[A, HashSet[B]],
-                         b: TableRef[A, HashSet[B]]) =
-  for k in b.keys:
-    a[k] = a.getOrDefault(k, initHashSet[B]()) + b[k]
 
 proc makeFollowposTable(t: ReSynTree): Pos2PosSet =
   # init
@@ -662,7 +637,7 @@ const
   readingClass = int8(0)
   readingEscape = int8(1)
   readingDot = int8(2)
-  classHead = int8(3)
+  # classHead = int8(3)
   readingBraceS = int8(4)
   readingBraceE = int8(5)
   readingClassRange = int8(6)
@@ -1013,7 +988,6 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
     clause[0].expectKind({nnkRStrLit, nnkStrLit})
     clause[1].expectKind(nnkStmtList)
     let
-      reStr = clause[0].strVal
       param = newTree(nnkIdentDefs,
                       newIdentNode("token"),
                       newIdentNode("LToken"),

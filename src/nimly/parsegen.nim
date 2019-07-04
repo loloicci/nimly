@@ -930,8 +930,6 @@ macro nimy*(head, body: untyped): untyped =
   )
   let
     tmpName = genSym(nskProc)
-  var
-    tableName: NimNode
   result.add(
     tableMakerProc(tmpName, tokenType, tokenKind, topNonTermNode, tableMaker,
                    ruleIds, ruleDefs, symNodes)
