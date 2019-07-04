@@ -71,7 +71,7 @@ proc closure[T](g: Grammar[T], whole: LALRItems[T]): LALRItems[T] =
     checkSet = new
 
 proc closure[T](g: Grammar[T], single: LALRItem[T]): LALRItems[T] =
-  result = g.closure([single].toSet)
+  result = g.closure([single].toHashSet)
 
 proc toLALRItem[T](lrItem: LRItem[T], ahead: Symbol[T]): LALRItem[T] =
   result = LALRItem[T](rule: lrItem.rule, pos: lrItem.pos, ahead: ahead)
@@ -121,7 +121,7 @@ proc toLALRKernel[T](lrKernel: SetOfLRItems[T], g: Grammar[T],
           if ci.next != End[T]():
             propagation[itm] = (propagation[itm] +
                                 [(tt[idx][ci.next],
-                                  ci.foward.toLRItem)].toSet)
+                                  ci.foward.toLRItem)].toHashSet)
         else:
           let prpgtd = ci.foward
           assert tt[idx][ci.next] < lrKernel.card

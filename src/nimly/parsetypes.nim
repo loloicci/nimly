@@ -124,7 +124,7 @@ proc initGrammar*[T](rules: HashSet[Rule[T]], start: Symbol[T]): Grammar[T] =
 
 proc initGrammar*[T](rules: openArray[Rule[T]],
                      start: Symbol[T]): Grammar[T] =
-  result = initGrammar(rules.toSet, start)
+  result = initGrammar(rules.toHashSet, start)
 
 proc filterRulesLeftIs*[T](g: Grammar[T], x: Symbol[T]): seq[Rule[T]] =
   result = @[]
@@ -176,9 +176,9 @@ proc makeFirstTable[T](g: Grammar[T]): FirstTable[T] =
         initHashSet.init()
         result[s] = initHashSet
       TermS:
-        result[s] = [s].toSet
+        result[s] = [s].toHashSet
       Empty:
-        result[s] = [s].toSet
+        result[s] = [s].toHashSet
       _:
         doAssert false, "There is a non-symbol in rules."
 
@@ -192,7 +192,7 @@ proc makeFirstTable[T](g: Grammar[T]): FirstTable[T] =
     for r in g.rules:
       var fEmp = true
       for s in r.right:
-        let newFst = result[r.left] + (result[s] - [Empty[T]()].toSet)
+        let newFst = result[r.left] + (result[s] - [Empty[T]()].toHashSet)
         if result[r.left] != newFst:
           fCnt = true
         result[r.left] = newFst
@@ -227,7 +227,7 @@ proc makeFollowTable[T](g: Grammar[T]): FollowTable[T] =
           TermS:
             # renew meta data
             fEmpTail = false
-            firstSyms = [sym].toSet
+            firstSyms = [sym].toHashSet
           Empty:
             discard
           NonTermS:

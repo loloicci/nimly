@@ -69,11 +69,11 @@ proc closure[T](g: Grammar[T], whole: LRItems[T]): LRItems[T] =
 proc goto[T](g: Grammar[T], itms: LRItems[T], s: Symbol[T]): LRItems[T] =
   doAssert s.kind != SymbolKind.End
   assert itms == g.closure(itms)
-  var gotoSet = initHashSet[LRItem[T]]()
+  var gotoHashSet = initHashSet[LRItem[T]]()
   for i in itms:
     if i.next == s:
-      gotoSet.incl(i.pointForward)
-  result = g.closure(gotoSet)
+      gotoHashSet.incl(i.pointForward)
+  result = g.closure(gotoHashSet)
 
 proc hash*[T](x: LRItem[T]): Hash =
   var h: Hash = 0
@@ -83,7 +83,7 @@ proc hash*[T](x: LRItem[T]): Hash =
 
 proc makeCanonicalCollection*[T](g: Grammar[T]): (SetOfLRItems[T],
                                                   TransTable[T]) =
-  let init = g.closure([LRItem[T](rule: g.startRule, pos: 0)].toSet)
+  let init = g.closure([LRItem[T](rule: g.startRule, pos: 0)].toHashSet)
   var
     cc = [
       init
