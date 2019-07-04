@@ -172,9 +172,9 @@ proc makeFirstTable[T](g: Grammar[T]): FirstTable[T] =
   for s in g.symbolSet:
     match s:
       NonTermS:
-        var initSet: HashSet[Symbol[T]]
-        initSet.init()
-        result[s] = initSet
+        var initHashSet: HashSet[Symbol[T]]
+        initHashSet.init()
+        result[s] = initHashSet
       TermS:
         result[s] = [s].toSet
       Empty:
@@ -207,9 +207,9 @@ proc makeFollowTable[T](g: Grammar[T]): FollowTable[T] =
   doAssert g.firstTable.len != 0, "firstTable is nill."
   result = initTable[Symbol[T], HashSet[Symbol[T]]]()
   for s in g.nonTermSymbolSet:
-    var initSet: HashSet[Symbol[T]]
-    initSet.init()
-    result[s] = initSet
+    var initHashSet: HashSet[Symbol[T]]
+    initHashSet.init()
+    result[s] = initHashSet
   result[g.start].incl(End[T]())
   var fCnt = true
   while fCnt:
@@ -262,7 +262,7 @@ proc augument*[T](g: Grammar[T]): Grammar[T] =
     result.firstTable = result.makeFirstTable
     result.followTable = result.makeFollowTable
     return
-  var singleStart = initSet[Rule[T]]()
+  var singleStart = initHashSet[Rule[T]]()
   singleStart.incl(startRule)
   let newRules = g.rules + singleStart
   result = initGrammar(newRules, start)

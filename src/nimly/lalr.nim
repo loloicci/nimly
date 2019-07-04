@@ -18,9 +18,9 @@ type
   PropagateTable[T] = Table[LRItem[T], HashSet[(int, LRItem[T])]]
 
 proc initLALRItems[T](): LALRItems[T] =
-  result = initSet[LALRItem[T]]()
+  result = initHashSet[LALRItem[T]]()
 
-proc initSetOfLALRItems[T](): SetOfLALRItems[T] =
+proc initHashSetOfLALRItems[T](): SetOfLALRItems[T] =
   result = initOrderedTable[int, LALRItems[T]]()
 
 proc initPropagateTable[T](): PropagateTable[T] =
@@ -92,7 +92,7 @@ proc foward[T](itm: LALRItem[T]): LALRItem[T] =
 proc toLALRKernel[T](lrKernel: SetOfLRItems[T], g: Grammar[T],
                      tt: TransTable[T]): SetOfLALRItems[T] =
   # init result
-  result = initSetOfLALRItems[T]()
+  result = initHashSetOfLALRItems[T]()
   doAssert lrKernel.card > 0
   for idx in 0..<lrKernel.card:
     result.incl(initLALRItems[T]())
@@ -113,7 +113,7 @@ proc toLALRKernel[T](lrKernel: SetOfLRItems[T], g: Grammar[T],
     echo "[nimly] converting kernel: " & $(idx + 1) & "/" & $lrKernel.len
     for itm in itms:
       if not (propagation.haskey(itm)):
-        propagation[itm] = initSet[(int, LRItem[T])]()
+        propagation[itm] = initHashSet[(int, LRItem[T])]()
 
       let clsr = g.closure(itm.toLALRItem(Dummy[T]()))
       for ci in clsr:

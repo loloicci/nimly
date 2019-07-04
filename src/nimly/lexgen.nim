@@ -252,7 +252,7 @@ proc lastpos(t: ReSynTree): HashSet[Pos] =
 proc mergeSetTable[A; B](a: var TableRef[A, HashSet[B]],
                          b: TableRef[A, HashSet[B]]) =
   for k in b.keys:
-    a[k] = a.getOrDefault(k, initSet[B]()) + b[k]
+    a[k] = a.getOrDefault(k, initHashSet[B]()) + b[k]
 
 proc makeFollowposTable(t: ReSynTree): Pos2PosSet =
   # init
@@ -303,7 +303,7 @@ proc makeCharPossetTable(t: ReSynTree): TableRef[char, HashSet[Pos]] =
 
   result = newTable[char, HashSet[Pos]]()
   for c in chars:
-    result[c] = initSet[Pos]()
+    result[c] = initHashSet[Pos]()
 
   for l in t.terms:
     match l:
@@ -347,7 +347,7 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
     tran[s] = newDTranRow()
     for c in chars:
       let posSet = ps * charPosset[c]
-      var newSPos: HashSet[Pos] = initSet[Pos]()
+      var newSPos: HashSet[Pos] = initHashSet[Pos]()
       for p in posSet:
         newSPos = newSPos + followpos[p]
       var nState: DState
@@ -398,13 +398,13 @@ proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
       for i, sp in subparts:
         let (sos, tran) = sp
         if sTran == tran:
-          var single = initSet[DState]()
+          var single = initHashSet[DState]()
           single.incl(state)
           subparts[i] = (sos + single, tran)
           isNewPart = false
           break
       if isNewPart:
-        var single = initSet[DState]()
+        var single = initHashSet[DState]()
         single.incl(state)
         subparts.add((single, sTran))
 
@@ -416,7 +416,7 @@ proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
   parts = retParts
 
 proc removeDead[T](input: DFA[T]): DFA[T] =
-  var dead = initSet[DState]()
+  var dead = initHashSet[DState]()
   for s, tr in input.tran:
     if input.accepts.haskey(s):
       continue
@@ -472,12 +472,12 @@ proc minimizeStates*[T](input: DFA[T]): DFA[T] =
   echo "[nimly] start : minimize lexer state"
   var
     initPart: seq[HashSet[DState]] = @[]
-    other = initSet[DState]()
+    other = initHashSet[DState]()
   for i in 0..<input.stateNum:
     other.incl(i)
 
   for k in input.accepts.keys:
-    var single = initSet[DState]()
+    var single = initHashSet[DState]()
     single.incl(k)
     other.excl(k)
     initPart.add(single)
