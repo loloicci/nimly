@@ -170,7 +170,7 @@ proc collectChar(t: ReSynTree): set[char] =
         match l:
           Empty:
             continue
-          Char(pos: p, c: lc):
+          Char(pos: _, c: lc):
             match lc:
               End:
                 continue
@@ -846,7 +846,7 @@ proc handleQuantifier(input: seq[RePart]): seq[RePart] =
   var bfr = input[0]
   for i, rp in input[1..(input.len - 1)]:
     match rp:
-      RChar(c: c):
+      RChar(c: _):
         if bfr.kind in {RePartKind.RChar, RePartKind.Tree}:
           result.add(bfr)
       Special(sc: c):
@@ -869,7 +869,7 @@ proc handleQuantifier(input: seq[RePart]): seq[RePart] =
         doassert (bfr.kind != RePartKind.Special and
                   bfr.kind != RePartKind.Brace), "invalid quantifier"
         result.add(Tree(tree = bfr.treeBrace(s, e)))
-      Tree(tree: t):
+      Tree(tree: _):
         if bfr.kind in {RePartKind.RChar, RePartKind.Tree}:
           result.add(bfr)
     bfr = rp
