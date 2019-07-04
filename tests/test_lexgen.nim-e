@@ -41,11 +41,11 @@ let
 
 test "test makeFollowposTable (Dragonbook 3.9.4)":
   var
-    one = initHashSet[Pos]()
-    two = initHashSet[Pos]()
-    three = initHashSet[Pos]()
-    four = initHashSet[Pos]()
-    five = initHashSet[Pos]()
+    one = initSet[Pos]()
+    two = initSet[Pos]()
+    three = initSet[Pos]()
+    four = initSet[Pos]()
+    five = initSet[Pos]()
   one.incl(1)
   one.incl(2)
   one.incl(3)
@@ -87,8 +87,8 @@ test "test makeDFA (Dragonbook 3.9.5)":
 test "test minimizeStates (id)":
   let dfa = makeDFA[string](dbookExampleLexRe)
   var
-    acc = initHashSet[DState]()
-    other = initHashSet[DState]()
+    acc = initSet[DState]()
+    other = initSet[DState]()
   for i in 0..<dfa.stateNum:
     if dfa.accepts.haskey(i):
       acc.incl(i)
@@ -102,8 +102,8 @@ test "test minimizeStates (id)":
 test "test minimizeStates":
   let dfa = dbookExampleDFA3p36
   var
-    acc = initHashSet[DState]()
-    other = initHashSet[DState]()
+    acc = initSet[DState]()
+    other = initSet[DState]()
   for i in 0..<dfa.stateNum:
     if dfa.accepts.haskey(i):
       acc.incl(i)

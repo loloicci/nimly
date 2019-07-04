@@ -10,7 +10,7 @@ let
               NonTermS[string]("C"),NonTermS[string]("C")),
       newRule(NonTermS[string]("C"), TermS("c"), NonTermS[string]("C")),
       newRule(NonTermS[string]("C"), TermS("d")),
-    ].toSet,
+    ].toHashSet,
     NonTermS[string]("S")
   ).augument
 
@@ -22,14 +22,14 @@ let
       newRule(NonTermS[string]("L"), TermS("*"), NonTermS[string]("R")),
       newRule(NonTermS[string]("L"), TermS("id")),
       newRule(NonTermS[string]("R"), NonTermS[string]("L")),
-    ].toSet,
+    ].toHashSet,
     NonTermS[string]("S")
   ).augument
 
 test "test closure for lalr":
   let
     itm = LALRItem[string](rule: g.startRule, pos: 0, ahead: End[string]())
-    c = closure(g, toSet[LALRItem[string]]([itm]))
+    c = closure(g, toHashSet[LALRItem[string]]([itm]))
     expected =  [
       itm,
       LALRItem[string](
@@ -58,7 +58,7 @@ test "test closure for lalr":
         pos: 0,
         ahead: TermS("d")
       )
-    ].toSet
+    ].toHashSet
 
   check c == expected
 
