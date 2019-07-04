@@ -1225,7 +1225,7 @@ macro niml*(name, body: untyped): untyped =
   name.expectKind(nnkBracketExpr)
   body.expectKind(nnkStmtList)
   let
-    nameStr = $name[0].ident
+    nameStr = name[0].strVal
     typeId = name[1]
   result = newStmtList()
 

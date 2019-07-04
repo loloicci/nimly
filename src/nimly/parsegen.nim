@@ -103,23 +103,23 @@ proc convertToSymNode(node, kindTy: NimNode,
   case node.kind
   of nnkBracketExpr:
     doAssert node.len == 1
-    let innerSym = $node[0].ident
+    let innerSym = node[0].strVal
     return nnkCall.newTree(
       nnkBracketExpr.newTree(
         newIdentNode("NonTermS"),
         kindTy
       ),
-      newStrLitNode($nimyInfo[innerSym].optRule.ident)
+      newStrLitNode(nimyInfo[innerSym].optRule.strVal)
     )
   of nnkCurlyExpr:
     doAssert node.len == 1
-    let innerSym = $node[0].ident
+    let innerSym = node[0].strVal
     return nnkCall.newTree(
       nnkBracketExpr.newTree(
         newIdentNode("NonTermS"),
         kindTy
       ),
-      newStrLitNode($nimyInfo[innerSym].repRule.ident)
+      newStrLitNode(nimyInfo[innerSym].repRule.strVal)
     )
   of nnkBracket:
     doAssert node.len == 0 and (not (noEmpty)), "rule cannot empty or" &
@@ -131,7 +131,7 @@ proc convertToSymNode(node, kindTy: NimNode,
       )
     )
   of nnkIdent:
-    let name = $(node.ident)
+    let name = node.strVal
     return convertToSymNode(name, kindTy, nimyInfo)
   else:
     doAssert false
@@ -155,12 +155,12 @@ proc nonTermOrEmpty(node: NimNode, nimyInfo: NimyInfo): string =
     return ""
   of nnkBracketExpr:
     assert node.len == 1
-    return $nimyInfo[$node[0].ident].optRule.ident
+    return nimyInfo[node[0].strVal].optRule.strVal
   of nnkCurlyExpr:
     assert node.len == 1
-    return $nimyInfo[$node[0].ident].repRule.ident
+    return nimyInfo[node[0].strVal].repRule.strVal
   else:
-    let s = $(node.ident)
+    let s = node.strVal
     if s.isNonTerm(nimyInfo):
       result = s
     else:
@@ -170,7 +170,7 @@ proc isTerm(node: NimNode, nimyInfo: NimyInfo): bool =
   node.expectKind({nnkBracket, nnkIdent, nnkBracketExpr, nnkCurlyExpr})
   if node.kind in {nnkBracket, nnkBracketExpr, nnkCurlyExpr}:
     return false
-  elif not (($node.ident).isNonTerm(nimyInfo)):
+  elif not (node.strVal.isNonTerm(nimyInfo)):
     return true
   return false
 
@@ -218,7 +218,7 @@ proc parseLeft(clause: NimNode): (string, NimNode) =
   clause[0].expectKind(nnkBracketExpr)
   doAssert clause[0].len == 2
   let
-    nonTerm = $(clause[0][0].ident)
+    nonTerm = clause[0][0].strVal
     rType = clause[0][1]
   return (nonTerm, rType)
 
@@ -672,7 +672,7 @@ macro nimy*(head, body: untyped): untyped =
   let
     parserName = head[0]
     tokenType = head[1]
-    tokenKind = parseStmt($tokenType.ident & "Kind")[0]
+    tokenKind = parseStmt(tokenType.strVal & "Kind")[0]
   for i, hd in head:
     if i > 1:
       if hd.kind == nnkIdent and $hd == "LR0":
@@ -723,12 +723,12 @@ macro nimy*(head, body: untyped): untyped =
       if ruleClause.kind == nnkCommentStmt:
         continue
       for sym in ruleClause.ruleRight:
-        if sym.isTerm(nimyInfo) and not(nimyInfo.haskey($sym.ident)):
-          nimyInfo[$sym.ident] = initNimyRow(Term)
+        if sym.isTerm(nimyInfo) and not(nimyInfo.haskey(sym.strVal)):
+          nimyInfo[sym.strVal] = initNimyRow(Term)
         if not (sym.kind in {nnkBracketExpr, nnkCurlyExpr}):
           continue
         doAssert sym.len == 1
-        let innerSym = $sym[0].ident
+        let innerSym = sym[0].strVal
         if sym[0].isTerm(nimyInfo) and
            not(nimyInfo.haskey(innersym)):
           nimyInfo[innerSym] = initNimyRow(Term)
