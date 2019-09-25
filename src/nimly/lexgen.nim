@@ -66,7 +66,7 @@ proc newDTran(): DTran =
 proc newDTranRow(): DTranRow =
   result = newTable[char, DState]()
 
-proc accPosImplDebug(t: ReSynTree): seq[Pos] =
+proc accPosImplDebug(t: ReSynTree): seq[Pos] {.used.} =
   result = @[]
   var checkSet: seq[ReSynTree] = @[t]
   while checkSet.len > 0:
@@ -87,7 +87,7 @@ proc accPosImplDebug(t: ReSynTree): seq[Pos] =
         checkSet.add(r[])
         checkSet.add(l[])
 
-proc accPosImpl(t: ReSynTree): seq[Pos] =
+proc accPosImpl(t: ReSynTree): seq[Pos] {.used.} =
   result = @[]
   var checkSet: seq[ReSynTree] = @[t]
   while checkSet.len > 0:

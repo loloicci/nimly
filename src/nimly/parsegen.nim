@@ -2,8 +2,6 @@ import macros
 import tables
 import sets
 
-import patty
-
 import parsetypes
 import parser
 
