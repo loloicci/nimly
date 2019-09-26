@@ -50,11 +50,14 @@ nimy testPar[MyToken]:
     ## float (integer part is 0-9) or integer
     NUM DOT[] NUM{}:
       result = ""
-      result.add(($1).val)
+      # type of `($1).val` is `int`
+      result &= $(($1).val)
       if ($2).len > 0:
-        result.add(".")
+        result &= "."
+      # type of `$3` is `seq[MyToken]` and each elements are NUM
       for tkn in $3:
-        result.add(tkn.val)
+        # type of `tkn.val` is `int`
+        result &= $(tkn.val)
 
 test "test Lexer":
   var testLexer = testLex.newWithString("1 + 42 * 101010")
