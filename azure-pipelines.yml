@@ -7,7 +7,7 @@ pr:
 pool:
   vmImage: 'Ubuntu-16.04'
 
-container: loloiccl/ubuntu-mynim:latest
+container: nimlang/nim:latest
 
 steps:
 - script: nimble test -y
