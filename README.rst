@@ -5,16 +5,18 @@
 
 Lexer Generator and Parser Generator as a library in Nim.
 
-Lexer and parser can written in formats like lex and yacc and
-these are generated in compile-time.
+With nimly, you can make lexer/parser by writing definition
+in formats like lex/yacc.
+``nimly`` generates lexer and parser by using macro in compile-time,
+so you can use ``nimly`` not as external tool of your program but as a library.
 
 niml
 ====
-niml is a lexer generator work in Nim-lang.
+``niml`` is a lexer generator work in Nim-lang.
 
 macro niml
 ----------
-macro niml makes a lexer.
+macro ``niml`` makes a lexer.
 Almost all part of constructing a lexer is done in comile-time.
 Example is as follows.
 
@@ -68,11 +70,11 @@ Each of followings is recognized as character set.
 
 nimy
 ====
-niml is a LALR(1) parser generator work in Nim-lang.
+``nimy`` is a LALR(1) parser generator work in Nim-lang.
 
 macro nimy
 ----------
-macro nimy makes a parser.
+macro ``nimy`` makes a parser.
 Almost all part of constructing a parser is done in compile-time.
 Example is as follows.
 
@@ -186,13 +188,13 @@ Example
       ## float (integer part is 0-9) or integer
       NUM DOT[] NUM{}:
         result = ""
- 
+
         # type of `($1).val` is `int`
         result &= $(($1).val)
 
         if ($2).len > 0:
           result &= "."
-  
+
         # type of `$3` is `seq[MyToken]` and each elements are NUM
         for tkn in $3:
           # type of `tkn.val` is `int`

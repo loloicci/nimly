@@ -34,19 +34,25 @@ nimy testPar[MyToken]:
   top[string]:
     plus:
       return $1
+
   plus[string]:
     mult PLUS plus:
       return $1 & " + " & $3
+
     mult:
       return $1
+
   mult[string]:
     num MULTI mult:
       return "[" & $1 & " * " & $3 & "]"
+
     num:
       return $1
+
   num[string]:
     LPAREN plus RPAREN:
       return "(" & $2 & ")"
+
     ## float (integer part is 0-9) or integer
     NUM DOT[] NUM{}:
       result = ""
@@ -62,10 +68,13 @@ nimy testPar[MyToken]:
 test "test Lexer":
   var testLexer = testLex.newWithString("1 + 42 * 101010")
   testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
+
   var
     ret: seq[MyTokenKind] = @[]
+
   for token in testLexer.lexIter:
     ret.add(token.kind)
+
   check ret == @[MyTokenKind.NUM, MyTokenKind.PLUS, MyTokenKind.NUM,
                  MyTokenKind.NUM, MyTokenKind.MULTI,
                  MyTokenKind.NUM, MyTokenKind.NUM, MyTokenKind.NUM,
@@ -74,23 +83,30 @@ test "test Lexer":
 test "test Parser 1":
   var testLexer = testLex.newWithString("1 + 42 * 101010")
   testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
+
   testPar.init()
   check testPar.parse(testLexer) == "1 + [42 * 101010]"
+
   testLexer.initWithString("1 + 42 * 1010")
+
   testPar.init()
   check testPar.parse(testLexer) == "1 + [42 * 1010]"
 
 test "test Parser 2":
   var testLexer = testLex.newWithString("1 + 42 * 1.01010")
   testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
+
   testPar.init()
   check testPar.parse(testLexer) == "1 + [42 * 1.01010]"
+
   testLexer.initWithString("1. + 4.2 * 101010")
+
   testPar.init()
   check testPar.parse(testLexer) == "1. + [4.2 * 101010]"
 
 test "test Parser 3":
   var testLexer = testLex.newWithString("(1 + 42) * 1.01010")
   testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
+
   testPar.init()
   check testPar.parse(testLexer) == "[(1 + 42) * 1.01010]"
