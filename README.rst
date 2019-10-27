@@ -269,6 +269,10 @@ Contribute
 4. Push it to the branch
 5. Create new pull request
 
+Changelog
+=========
+See changelog.rst_.
+
 Developing
 ==========
 You can use ``nimldebug`` and ``nimydebug`` as a conditional symbol
@@ -281,3 +285,4 @@ example: ``nim c -d:nimldebug -d:nimydebug -r tests/test_nimly.nim``
     :target: https://dev.azure.com/oxisccl/nimly/_build/latest?definitionId=1&branchName=master
 .. |nimble| image:: https://raw.githubusercontent.com/yglukhov/nimble-tag/master/nimble.png
     :target: https://github.com/yglukhov/nimble-tag
+.. _changelog.rst: ./changelog.rst
