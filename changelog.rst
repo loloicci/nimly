@@ -2,6 +2,14 @@
  Changelog
 ###########
 
+[v0.4.1] - 2020-01-06
+=====================
+
+Fixed
+-----
+* Fix the bug that lexer sometimes count a newlines multiply
+  for line number information (Issue #34)
+
 [v0.4.0] - 2019-09-25
 =====================
 
