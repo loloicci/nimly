@@ -39,6 +39,8 @@ proc lex*[T](nl: var NimlLexer[T]): T =
     lastAccState: State = deadState
     pos = nl.bufpos
     lastAccPos: int = -1
+    lastAccLine: int = -1
+    lastAccCol: int = -1
     ltoken = LToken(colNum: colNum, lineNum: lineNum, lineInfo: lineInfo)
   when defined(nimldebug):
     echo "--lex start--"
@@ -68,6 +70,7 @@ proc lex*[T](nl: var NimlLexer[T]): T =
       lastAccToken = token
       lastAccState = state
       lastAccPos = pos
+      lastAccLine = nl.lineNumber
     assert c != EndOfFile or state == -1, "invalid EOF while lexing"
 
   doassert lastAccState != deadState, "LexError:\n" & lineInfo
@@ -77,6 +80,7 @@ proc lex*[T](nl: var NimlLexer[T]): T =
   result = nl.data.dba[lastAccState].accept.fun(ltoken)
 
   nl.bufpos = lastAccPos
+  nl.lineNumber = lastAccLine
   when defined(nimldebug):
     echo "--lex end--"
     echo "token:" & lastAccToken
