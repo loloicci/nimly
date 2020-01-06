@@ -49,10 +49,17 @@ proc lex*[T](nl: var NimlLexer[T]): T =
     case c
     of '\L':
       pos = nl.handleLF(pos)
+      when defined(nimldebug):
+        echo "handleLF"
     of '\c':
       pos = nl.handleCR(pos)
+      when defined(nimldebug):
+        echo "handleCR"
     else:
       inc(pos)
+      when defined(nimldebug):
+        echo "handleOther"
+
     state = nl.data.nextState(state, c)
     when defined(nimldebug):
       echo "read:" & c
