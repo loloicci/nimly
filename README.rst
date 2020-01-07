@@ -119,7 +119,7 @@ Example of these is in next section.
 
 Example
 =======
-``tests/test_nimly.nim`` is an easy example.
+``tests/test_readme_example.nim`` is an easy example.
 
 .. code-block:: nim
 
@@ -278,7 +278,7 @@ Developing
 You can use ``nimldebug`` and ``nimydebug`` as a conditional symbol
 to print debug info.
 
-example: ``nim c -d:nimldebug -d:nimydebug -r tests/test_nimly.nim``
+example: ``nim c -d:nimldebug -d:nimydebug -r tests/test_readme_example.nim``
 
 
 .. |azure_pipelines| image:: https://dev.azure.com/oxisccl/nimly/_apis/build/status/loloiccl.nimly?branchName=master
