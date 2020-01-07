@@ -2,7 +2,7 @@
 
 version       = "0.4.1"
 author        = "Lolo Iccl"
-description   = "A lexer generator and parser generator package work in Nim."
+description   = "Lexer Generator and Parser Generator as a library in Nim."
 license       = "GPL-3.0"
 srcDir        = "src"
 
