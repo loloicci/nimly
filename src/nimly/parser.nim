@@ -54,16 +54,16 @@ type
   ParsingTable*[T] = object
     action*: ActionTable[T]
     goto*: GotoTable[T]
-  ConstActionTable* = seq[seq[int]]
-  ConstGotoTable* = seq[seq[int]]
+  ConstActionTable = seq[seq[int]]
+  ConstGotoTable = seq[seq[int]]
   ConstTable* = (ConstActionTable, ConstGotoTable)
-  SymbolToInt*[T] = Table[Symbol[T], int]
-  RuleToInt*[T] = Table[Rule[T], int]
+  SymbolToInt[T] = Table[Symbol[T], int]
+  RuleToInt[T] = Table[Rule[T], int]
   Parser*[T] = object
     stack: seq[State]
-    table*: ParsingTable[T]
-  IntToSym*[T] = Table[int, Symbol[T]]
-  IntToRule*[T] = Table[int, Rule[T]]
+    table: ParsingTable[T]
+  IntToSym[T] = Table[int, Symbol[T]]
+  IntToRule[T] = Table[int, Rule[T]]
 
 proc `$`*[T](at: ActionTable[T]): string =
   result = "\nActionTable:\n--------\n"
@@ -161,16 +161,16 @@ proc `$`*[T, S](pt: ParseTree[T, S], indent: int = 0): string =
       for n in t:
         result = result & `$`(n, indent + 1)
 
-proc add*[T](parser: var Parser[T], s: State) =
+proc add[T](parser: var Parser[T], s: State) =
   parser.stack.add(s)
 
-proc push*[T](parser: var Parser[T], s: State) =
+proc push[T](parser: var Parser[T], s: State) =
   parser.add(s)
 
-proc pop*[T](parser: var Parser[T]): State =
+proc pop[T](parser: var Parser[T]): State =
   return parser.stack.pop
 
-proc top*[T](parser: Parser[T]): State =
+proc top[T](parser: Parser[T]): State =
   return parser.stack[parser.stack.high]
 
 proc parseImpl*[T, S](parser: var Parser[S],

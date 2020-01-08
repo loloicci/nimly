@@ -32,12 +32,12 @@ proc `$`*[T](s: SetOfLRItems[T]): string =
     result = result & $i & ":" & $itms & "\n"
   result = result & "--------\n"
 
-proc next*[T](i: LRItem[T]): Symbol[T] =
+proc next[T](i: LRItem[T]): Symbol[T] =
   if i.pos >= i.rule.len:
     return End[T]()
   result = i.rule.right[i.pos]
 
-proc nextSkipEmpty*[T](i: LRItem[T]): Symbol[T] =
+proc nextSkipEmpty[T](i: LRItem[T]): Symbol[T] =
   result = End[T]()
   for idx in i.pos..<i.rule.len:
     let nxt = i.rule.right[idx]
@@ -45,7 +45,7 @@ proc nextSkipEmpty*[T](i: LRItem[T]): Symbol[T] =
       result = nxt
       break
 
-proc pointForward*[T](i: LRItem[T]): LRItem[T] =
+proc pointForward[T](i: LRItem[T]): LRItem[T] =
   doAssert i.pos < i.rule.len
   result = LRItem[T](rule: i.rule, pos: i.pos + 1)
 
