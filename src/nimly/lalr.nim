@@ -9,7 +9,7 @@ import parser
 import lr
 
 type
-  LALRItem*[T] = object
+  LALRItem[T] = object
     rule: Rule[T]
     pos: int
     ahead: Symbol[T]
@@ -33,12 +33,12 @@ proc hash*[T](x: LALRItem[T]): Hash =
   h = h !& hash(x.ahead)
   return !$h
 
-proc next*[T](i: LALRItem[T]): Symbol[T] =
+proc next[T](i: LALRItem[T]): Symbol[T] =
   if i.pos >= i.rule.len:
     return End[T]()
   result = i.rule.right[i.pos]
 
-proc nextSkipEmpty*[T](i: LALRItem[T]): Symbol[T] =
+proc nextSkipEmpty[T](i: LALRItem[T]): Symbol[T] =
   result = End[T]()
   for idx in i.pos..<i.rule.len:
     let nxt = i.rule.right[idx]
@@ -46,7 +46,7 @@ proc nextSkipEmpty*[T](i: LALRItem[T]): Symbol[T] =
       result = nxt
       break
 
-proc fromNextNext*[T](i: LALRItem[T]): seq[Symbol[T]] =
+proc fromNextNext[T](i: LALRItem[T]): seq[Symbol[T]] =
   result = @[]
   doAssert i.pos < i.rule.len
   for index in (i.pos + 1)..<i.rule.len:

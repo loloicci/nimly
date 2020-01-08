@@ -48,8 +48,8 @@ variantp ReSynTree:
 type
   AccPosProc[T] = TableRef[Pos, AccProc[T]]
   LexRe*[T] = object
-    st*: ReSynTree
-    accPosProc*: AccPosProc[T]
+    st: ReSynTree
+    accPosProc: AccPosProc[T]
 
 proc newAccPosProc*[T](): AccPosProc[T] =
   result = newTable[Pos, AccProc[T]]()
