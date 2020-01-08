@@ -40,7 +40,6 @@ proc lex*[T](nl: var NimlLexer[T]): T =
     pos = nl.bufpos
     lastAccPos: int = -1
     lastAccLine: int = -1
-    lastAccCol: int = -1
     ltoken = LToken(colNum: colNum, lineNum: lineNum, lineInfo: lineInfo)
   when defined(nimldebug):
     echo "--lex start--"
