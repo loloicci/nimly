@@ -2,6 +2,13 @@
  Changelog
 ###########
 
+[v0.5.1] - 2020-01-28
+=====================
+
+Changed
+-------
+* Rename "test_nimly.nim" to "test_readme_example.nim".
+
 [v0.5.0] - 2020-01-08
 =====================
 
