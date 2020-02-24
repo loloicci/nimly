@@ -5,6 +5,7 @@ import macros
 import patty
 
 import lextypes
+import macroutil
 
 export tables
 export sets
@@ -896,191 +897,61 @@ proc convertToReSynTree*(re: string, nextPos: var int): ReSynTree =
                right = ~Term(lit = Char(pos = -1, c = End()))).reassignPos(
                  nextPos)
 
+
+
 proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
   var
-    lexerMakerBody = newStmtList()
     procs: seq[NimNode] = @[]
 
-  lexerMakerBody.add(
-    nnkWhenStmt.newTree(
-      nnkElifBranch.newTree(
-        nnkCall.newTree(
-          newIdentNode("defined"),
-          newIdentNode("nimlydebug")
-        ),
-        nnkStmtList.newTree(
-          nnkCommand.newTree(
-            newIdentNode("echo"),
-            newLit("START: makeing the lexer")
-          )
-        )
-      )
-    )
-  )
+  let
+    beginDebug = debugEchoNode("nimlydebug", "BEGIN: making the laxer")
+    endDebug = debugEchoNode("nimlydebug", "END: making the laxer")
+    app = genSym(nskVar)
+    acc = genSym(nskVar)
+    wholeRst = genSym(nskVar)
+    newPos = genSym(nskVar)
+    rst = genSym(nskVar)
 
-  # init part
-
-  # var app = newAccPosProc[T]()
-  let app = genSym(nskVar)
-  lexerMakerBody.add(
-    newVarStmt(
-      app,
-      newCall(
-        newTree(
-          nnkBracketExpr,
-          newIdentNode("newAccPosProc"),
-          typeId
-        )
-      )
-    )
-  )
-  # var acc: seq[Pos]
-  let acc = genSym(nskVar)
-  lexerMakerBody.add(
-    nnkStmtList.newTree(
-      nnkVarSection.newTree(
-        nnkIdentDefs.newTree(
-          acc,
-          nnkBracketExpr.newTree(
-            newIdentNode("seq"),
-            newIdentNode("Pos")
-          ),
-          newEmptyNode()
-        )
-      )
-    )
-  )
-
-  # var wholeRst: ReSynTree
-  let wholeRst = genSym(nskVar)
-  lexerMakerBody.add(
-    newTree(
-      nnkVarSection,
-      newTree(
-        nnkIdentDefs,
-        wholeRst,
-        newIdentNode("ReSynTree"),
-        newEmptyNode()
-      )
-    )
-  )
-
-  # var newPos = 0
-  let newPos = genSym(nskVar)
-  lexerMakerBody.add(
-    newVarStmt(
-      newPos,
-      newIntLitNode(0))
-  )
-
-  # var rst: ReSynTree
-  let rst = genSym(nskVar)
-  lexerMakerBody.add(
-    nnkStmtList.newTree(
-      nnkVarSection.newTree(
-        nnkIdentDefs.newTree(
-          rst,
-          newIdentNode("ReSynTree"),
-          newEmptyNode()
-        )
-      )
-    )
-  )
+  var lexerMakerBody = quote do:
+    `beginDebug`
+    var
+      `app` =newAccPosProc[`typeId`]()
+      `acc`: seq[Pos]
+      `wholeRst`: ReSynTree
+      `newPos` = 0
+      `rst`: ReSynTree
 
   # clause parser
-  proc parseClause(clause: NimNode, first: bool,
-                   lexerMakerBody: var NimNode, procs: var seq[NimNode]) =
+  proc parseClause(clause: NimNode, first: bool): (NimNode, NimNode) =
     clause.expectKind(nnkCall)
     clause[0].expectKind({nnkRStrLit, nnkStrLit})
     clause[1].expectKind(nnkStmtList)
-    let
-      param = newTree(nnkIdentDefs,
-                      newIdentNode("token"),
-                      newIdentNode("LToken"),
-                      newEmptyNode())
     # make proc to return token
     let
       procName = genSym(nskProc)
-      procNode = newProc(
-        name = procName,
-        params = @[typeId, param],
-        body = clause[1]
-      )
-    procs.add(procNode)
+      procBody = clause[1]
+      tokenName = newIdentNode("token")
+      procNode = quote do:
+        proc `procName`(`tokenName`: LToken): `typeId` =
+          `procBody`
 
-    # rst = (meta clause[0]).convertToReSynTree(newPos)
-    lexerMakerBody.add(
-      newAssignment(
-        rst,
-        newCall(
-          newIdentNode("convertToReSynTree"),
-          clause[0],
-          newPos
-        )
-      )
-    )
-    if first:
-      # wholeRst = rst
-      lexerMakerBody.add(
-        newAssignment(
-          wholeRst,
-          rst
-        )
-      )
-    else:
-      # wholeRst = Bin(bor,
-      #                ~rst,
-      #                ~wholeRst)
-      lexermakerBody.add(
-        newAssignment(
-          wholeRst,
-          newCall(
-            newIdentNode("Bin"),
-            newIdentNode("bor"),
-            nnkPrefix.newTree(
-              newIdentNode("~"),
-              wholeRst
-            ),
-            nnkPrefix.newTree(
-              newIdentNode("~"),
-              rst
-            )
-          )
-        )
-      )
+    # make body
+    let
+      pattern = clause[0]
+      wholeRstAssign = if first:
+                         quote do:
+                           `wholeRst` = `rst`
+                       else:
+                         quote do:
+                           `wholeRst` = Bin(bor, ~`wholeRst`, ~`rst`)
+      bodyNode = quote do:
+        `rst` = convertToReSynTree(`pattern`, `newPos`)
+        `wholeRstAssign`
+        `acc` = accPos(`rst`)
+        for i in `acc`:
+          `app`[i] = `procName`
 
-    # acc = accPos(rst)
-    lexerMakerBody.add(
-      nnkStmtList.newTree(
-        nnkAsgn.newTree(
-          acc,
-          nnkCall.newTree(
-            newIdentNode("accPos"),
-            rst
-          )
-        )
-      )
-    )
-    # for a in acc:
-    #   app[a] = (meta procName)
-    lexerMakerBody.add(
-      nnkStmtList.newTree(
-        nnkForStmt.newTree(
-          newIdentNode("a"),
-          acc,
-          nnkStmtList.newTree(
-            nnkCall.newTree(
-              nnkAccQuoted.newTree(
-                newIdentNode("[]=")
-              ),
-              app,
-              newIdentNode("a"),
-              procName
-            )
-          )
-        )
-      )
-    )
+    return (bodyNode, procNode)
 
   if body.len < 1:
     error "no clouse in niml"
@@ -1090,114 +961,31 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
   for clause in body:
     if clause.kind == nnkCommentStmt:
       continue
-    clause.parseClause(first, lexerMakerBody, procs)
+    let (bodyNode, procNode) = clause.parseClause(first)
+    lexerMakerBody.add(bodyNode)
+    procs.add(procNode)
     first = false
 
-    # make tail of lexerMakerBody
+  # make tail of lexerMakerBody
+  let
+    lr = genSym()
+    dfa = genSym()
+    minimizedDfa = genSym()
+    minimizedNode = when defined(nimlnonmin):
+                      quote do:
+                        let `minimizedDfa` = `dfa`
+                    else:
+                      quote do:
+                        let `minimizedDfa` = minimizeStates(`dfa`)
+    lexerMakerBodyTail = quote do:
+      let
+        `lr` = LexRe[`typeId`](st: `wholeRst`, accPosProc: `app`)
+        `dfa` = makeDFA[`typeId`](`lr`)
+      `minimizedNode`
+      result = convertToLexData(`minimizedDfa`)
+      `endDebug`
 
-  # let lr = LexRe[(meta typeId)](st: wholeRst, accPosProc: app)
-  let lrId = genSym()
-  lexerMakerBody.add(
-    nnkLetSection.newTree(
-      nnkIdentDefs.newTree(
-        lrId,
-        newEmptyNode(),
-        nnkObjConstr.newTree(
-          nnkBracketExpr.newTree(
-            newIdentNode("LexRe"),
-            typeId
-          ),
-          nnkExprColonExpr.newTree(
-            newIdentNode("st"),
-            wholeRst
-          ),
-          nnkExprColonExpr.newTree(
-            newIdentNode("accPosProc"),
-            app
-          )
-        )
-      )
-    )
-  )
-
-  # let dfa = makeDFA[(meta typeId)](lr)
-  let dfaId = genSym()
-  lexerMakerBody.add(
-    nnkLetSection.newTree(
-      nnkIdentDefs.newTree(
-        dfaId,
-        newEmptyNode(),
-        nnkCall.newTree(
-          nnkBracketExpr.newTree(
-            newIdentNode("makeDFA"),
-            typeId
-          ),
-          lrId
-        )
-      )
-    )
-  )
-
-  # let minimizedDfa = minimizeStates(dfa)
-  let minimizedDfa = genSym()
-  when defined(nimlnonmin):
-    lexerMakerBody.add(
-      nnkStmtList.newTree(
-        nnkLetSection.newTree(
-          nnkIdentDefs.newTree(
-            minimizedDfa,
-            newEmptyNode(),
-            dfaId
-          )
-        )
-      )
-    )
-
-  else:
-    lexerMakerBody.add(
-      nnkStmtList.newTree(
-        nnkLetSection.newTree(
-          nnkIdentDefs.newTree(
-            minimizedDfa,
-            newEmptyNode(),
-            nnkCall.newTree(
-              newIdentNode("minimizeStates"),
-              dfaId
-            )
-          )
-        )
-      )
-    )
-
-  # result = convertToLexData(dfa)
-  lexerMakerBody.add(
-    nnkStmtList.newTree(
-      nnkAsgn.newTree(
-        newIdentNode("result"),
-        nnkCall.newTree(
-          newIdentNode("convertToLexData"),
-          minimizedDfa
-        )
-      )
-    )
-  )
-
-  lexerMakerBody.add(
-    nnkWhenStmt.newTree(
-      nnkElifBranch.newTree(
-        nnkCall.newTree(
-          newIdentNode("defined"),
-          newIdentNode("nimlydebug")
-        ),
-        nnkStmtList.newTree(
-          nnkCommand.newTree(
-            newIdentNode("echo"),
-            newLit("END: makeing the lexer")
-          )
-        )
-      )
-    )
-  )
+  lexerMakerBody.add(lexerMakerBodyTail)
 
   return (lexerMakerBody, procs)
 
@@ -1216,40 +1004,20 @@ macro niml*(name, body: untyped): untyped =
   result.add(procs)
 
   # define proc lexerMaker in result
-
-  # proc ...Maker(): LexData[(meta typeId)] =
-  #   (meta lexerMakerBody)
-  let makerName = genSym(nskProc)
-  result.add(
-    newProc(
-      name = makerName,
-      params = @[
-        nnkBracketExpr.newTree(newIdentNode("LexData"),
-                               typeId)
-      ],
-      body = lexerMakerBody
-    )
-  )
+  let
+    makerName = genSym(nskProc)
+    lexerMakerNode = quote do:
+      proc `makerName`(): LexData[`typeId`] =
+        `lexerMakerBody`
+  result.add(lexerMakerNode)
 
   # call lexerMaker and define lexerTable as const in result
+  let
+    lexerNameNode = newIdentNode(nameStr)
+    callLexerMakerNode = quote do:
+      const `lexerNameNode`* = `makerName`()
+  result.add(callLexerMakerNode)
 
-  # const (meta nameStr) = ...Maker()
-  result.add(
-    nnkStmtList.newTree(
-      nnkConstSection.newTree(
-        nnkConstDef.newTree(
-          nnkPostfix.newTree(
-            newIdentNode("*"),
-            newIdentNode(nameStr)
-          ),
-          newEmptyNode(),
-          nnkCall.newTree(
-            makerName
-          )
-        )
-      )
-    )
-  )
-
+  # print debug info if nimldebug is defined
   when defined(nimldebug):
     echo toStrLit(result)
