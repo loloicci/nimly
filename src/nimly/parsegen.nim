@@ -54,43 +54,26 @@ proc initNimyInfo(): NimyInfo =
 proc initRuleToProc*[T, S, R](): RuleToProc[T, S, R] =
   return initTable[Rule[S], PTProc[T, S, R]]()
 
+#
 proc initRuleToProcNode(tokenType, tokenKind, returnType: NimNode): NimNode =
-  result = nnkAsgn.newTree(
-    newIdentNode("result"),
-    nnkCall.newTree(
-      nnkBracketExpr.newTree(
-        newIdentNode("initRuleToProc"),
-        tokenType,
-        tokenKind,
-        returnType
-      )
-    )
-  )
+  result = quote do:
+    result = initRuleToProc[`tokenType`, `tokenKind`, `returnType`]()
 
 proc genKindNode(kindTy, kind: NimNode): NimNode =
-  result = nnkDotExpr.newTree(
-    kindTy,
-    kind
-  )
+  result = quote do:
+    `kindTy`.`kind`
+#
 
 proc convertToSymNode(name: string, kindTy: NimNode,
                       nimyInfo: NimyInfo): NimNode =
   if name.isNonTerm(nimyInfo):
-    result = nnkCall.newTree(
-      nnkBracketExpr.newTree(
-        newIdentNode("NonTermS"),
-        kindTy
-      ),
-      newStrLitNode(name)
-    )
+    let nameNode = newLit(name)
+    result = quote do:
+      NonTermS[`kindTy`](`nameNode`)
   elif name.isTerm(nimyInfo):
-    result = nnkCall.newTree(
-      nnkBracketExpr.newTree(
-        newIdentNode("TermS"),
-        kindTy
-      ),
-      genKindNode(kindTy, newIdentNode(name))
-    )
+    let nameNode = newIdentNode(name)
+    result = quote do:
+      TermS[`kindTy`](`kindTy`.`nameNode`)
   else:
     doAssert false
 
@@ -101,33 +84,23 @@ proc convertToSymNode(node, kindTy: NimNode,
   case node.kind
   of nnkBracketExpr:
     doAssert node.len == 1
-    let innerSym = node[0].strVal
-    return nnkCall.newTree(
-      nnkBracketExpr.newTree(
-        newIdentNode("NonTermS"),
-        kindTy
-      ),
-      newStrLitNode(nimyInfo[innerSym].optRule.strVal)
-    )
+    let
+      innerSym = node[0].strVal
+      optName = newStrLitNode(nimyInfo[innerSym].optRule.strVal)
+    return quote do:
+      NonTermS[`kindTy`](`optName`)
   of nnkCurlyExpr:
     doAssert node.len == 1
-    let innerSym = node[0].strVal
-    return nnkCall.newTree(
-      nnkBracketExpr.newTree(
-        newIdentNode("NonTermS"),
-        kindTy
-      ),
-      newStrLitNode(nimyInfo[innerSym].repRule.strVal)
-    )
+    let
+      innerSym = node[0].strVal
+      repName = newStrLitNode(nimyInfo[innerSym].repRule.strVal)
+    return quote do:
+      NonTermS[`kindTy`](`repName`)
   of nnkBracket:
     doAssert node.len == 0 and (not (noEmpty)), "rule cannot empty or" &
       " contains [] if the rule is not empty"
-    return nnkCall.newTree(
-      nnkBracketExpr.newTree(
-        newIdentNode("Empty"),
-        kindTy
-      )
-    )
+    return quote do:
+      Empty[`kindTy`]()
   of nnkIdent:
     let name = node.strVal
     return convertToSymNode(name, kindTy, nimyInfo)
@@ -136,13 +109,8 @@ proc convertToSymNode(node, kindTy: NimNode,
 
 proc newRuleMakerNode(kindTy, left: NimNode,
                       right: varargs[NimNode]): NimNode =
-  result = nnkCall.newTree(
-    nnkBracketExpr.newTree(
-      newIdentNode("newRule"),
-      kindTy
-    ),
-    left
-  )
+  result = quote do:
+    newRule[`kindTy`](`left`)
   for node in right:
     result.add(node)
 
@@ -230,45 +198,21 @@ proc replaceBody(body, param: NimNode,
                  types: seq[string], nimyInfo: NimyInfo): NimNode =
   proc replaceImpl(body: NimNode): NimNode =
     if body.isSpecialVar:
-      let index = int((body[1].intVal) - 1)
+      let
+        index = int((body[1].intVal) - 1)
+        indexNode = newLit(index)
       # term
       if types[index] == "":
-        return nnkDotExpr.newTree(
-          nnkBracketExpr.newTree(
-            nnkDotExpr.newTree(
-              param,
-              newIdentNode("tree")
-            ),
-            newIntLitNode(index)
-          ),
-          newIdentNode("token")
-        )
+        return quote do:
+          `param`.tree[`indexNode`].token
       # nonterm
       else:
-        # table[param[index].rule](param[index].tree)
-        return nnkCall.newTree(
-          nnkBracketExpr.newTree(
-            nimyInfo[types[index]].ruleToProc,
-            nnkDotExpr.newTree(
-              nnkBracketExpr.newTree(
-                nnkDotExpr.newTree(
-                  param,
-                  newIdentNode("tree")
-                ),
-                newIntLitNode(index)
-              ),
-              newIdentNode("rule")
-            )
-          ),
-          nnkBracketExpr.newTree(
-            nnkDotExpr.newTree(
-              param,
-              newIdentNode("tree")
-            ),
-            newIntLitNode(index)
-          ),
-        )
-
+        # table[param.tree[index].rule](param[index].tree)
+        let
+          ruleToProcNode = nimyInfo[types[index]].ruleToProc
+        return quote do:
+          `ruleToProcNode`[`param`.tree[`indexNode`].rule](
+            `param`.tree[`indexNode`])
     else:
       if body.len > 0:
         result = newTree(body.kind)
@@ -280,6 +224,18 @@ proc replaceBody(body, param: NimNode,
 
 proc makeRuleProc(name, body, rTy, tokenType, tokenKind: NimNode,
                   types: seq[string], nimyInfo: NimyInfo, pt=false): NimNode =
+  #[
+  let
+    param = newIdentNode("nimlytree")
+  if not pt:
+    let procBody = body.replaceBody(param, types, nimyInfo)
+    result = quote do:
+      proc `name`(`param`: ParseTree[`tokenType`, `tokenKind`]): `rty` =
+        `procBody`
+  else:
+    result = quote do:
+      proc `name`(`param`: ParseTree[`tokenType`, `tokenKind`]): `rty`
+  ]#
   let
     param = newIdentNode("nimlytree")
     pTy =   nnkBracketExpr.newTree(newIdentNode("ParseTree"),
@@ -296,31 +252,21 @@ proc makeRuleProc(name, body, rTy, tokenType, tokenKind: NimNode,
 proc addVarSymToInt(stm : var NimNode,
                     id, tokenKind: NimNode, syms: seq[NimNode]) =
   stm.expectKind(nnkStmtList)
-  stm.add(
-    newVarStmt(
-      id,
-      nnkCall.newTree(
-        nnkBracketExpr.newTree(
-          newIdentNode("initTable"),
-          nnkBracketExpr.newTree(
-            newIdentNode("Symbol"),
-            tokenKind
-          ),
-          newIdentNode("int")
-        )
-      )
-    )
-  )
+  let tableInitNode = quote do:
+    var `id` = initTable[Symbol[`tokenKind`], int]()
+
+  var assignNode = newStmtList()
   for i, sym in syms:
-    stm.add(
-      nnkAsgn.newTree(
-        nnkBracketExpr.newTree(
-          id,
-          sym
-        ),
-        newIntLitNode(i)
-      )
+    let
+      iNode = newLit(i)
+      assignUnit = quote do:
+        `id`[`sym`] = `iNode`
+    assignNode.add(
+      assignUnit
     )
+
+  stm.add(tableInitNode)
+  stm.add(assignNode)
 
 proc addRuleToInt(stm : var NimNode,
                   id, tokenKind: NimNode, rules: seq[NimNode]) =
