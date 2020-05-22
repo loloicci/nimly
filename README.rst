@@ -3,7 +3,7 @@
 #######
 |azure_pipelines| |nimble|
 
-Lexer Generator and Parser Generator as a library in Nim.
+Lexer Generator and Parser Generator as a Macro Library in Nim.
 
 With nimly, you can make lexer/parser by writing definition
 in formats like lex/yacc.
