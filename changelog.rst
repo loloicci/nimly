@@ -2,6 +2,13 @@
  Changelog
 ###########
 
+Unreleased
+==========
+
+Fixed
+-----
+* Do some Refactorings.
+
 [v0.6.0] - 2020-05-22
 =====================
 
