@@ -354,11 +354,13 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
   return DFA[T](start: iState, accepts: accepts,
                 stateNum: stateNum, translations: translations)
 
-proc statePartTranslations[T](state: DState, parts: seq[HashSet[DState]],
-                              dfa: DFA[T]): TableRef[char, DState] =
+proc calculateTableCharsToNextPartitions[T](
+  state: DState,
+  partitions: seq[HashSet[DState]],
+  dfa: DFA[T]): TableRef[char, DState] =
   result = newTable[char, DState]()
   for c, s in dfa.translations[state]:
-    for i, p in parts:
+    for i, p in partitions:
       if s in p:
         result[c] = DState(i)
         break
@@ -370,7 +372,7 @@ proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
   for setOfStates in parts:
     var subparts: seq[(HashSet[DState], TableRef[char, DState])] = @[]
     for state in setOfStates:
-      let sTranslations = state.statePartTranslations(parts, dfa)
+      let sTranslations = state.calculateTableCharsToNextPartitions(parts, dfa)
       var isNewPart = true
       for i, sp in subparts:
         let (sos, translations) = sp
@@ -442,7 +444,8 @@ proc minimizeStates[T](input: DFA[T],
         result.accepts[i] = input.accepts[acc]
     inc(result.stateNum)
     for s in p:
-      result.translations[i] = s.statePartTranslations(partition, input)
+      result.translations[i] = s.calculateTableCharsToNextPartitions(partition,
+                                                                     input)
       break
 
   result = result.removeDead
