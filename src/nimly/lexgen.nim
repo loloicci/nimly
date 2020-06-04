@@ -23,14 +23,14 @@ type
 
   # for DFA
   DState = int
-  DTranRow = TableRef[char, DState]
-  DTran = TableRef[DState, DTranRow]
+  DTranslationsRow = TableRef[char, DState]
+  DTranslations = TableRef[DState, DTranslationsRow]
   DAccepts[T] = TableRef[DState, AccProc[T]]
   DFA[T] = object
     start: DState
     accepts: DAccepts[T]
     stateNum: int
-    tran: DTran
+    translations: DTranslations
 
 variant LChar:
   End
@@ -60,10 +60,10 @@ proc newPos2PosSet(): Pos2PosSet =
 proc newDAccepts[T](): DAccepts[T] =
   result = newTable[DState, AccProc[T]]()
 
-proc newDTran(): DTran =
-  result = newTable[DState, DTranRow]()
+proc newDTranslations(): DTranslations =
+  result = newTable[DState, DTranslationsRow]()
 
-proc newDTranRow(): DTranRow =
+proc newDTranslationsRow(): DTranslationsRow =
   result = newTable[char, DState]()
 
 proc accPosImplDebug(t: ReSynTree): seq[Pos] {.used.} =
@@ -300,7 +300,7 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
     followpos = t.makeFollowposTable
 
   var
-    tran = newDTran()
+    translations = newDTranslations()
     stateNum = 0
     posS2DState = newTable[HashSet[Pos], DSTate]()
     unmarked: seq[HashSet[Pos]] = @[]
@@ -315,12 +315,12 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
   posS2DState[iSPos] = iState
   unmarked.add(iSPos)
 
-  # make state and tran
+  # make state and translations
   while unmarked.len > 0:
     let
       ps = unmarked.pop
       s = posS2DState[ps]
-    tran[s] = newDTranRow()
+    translations[s] = newDTranslationsRow()
     for c in chars:
       let posSet = ps * charPosset[c]
       var newSPos: HashSet[Pos] = initHashSet[Pos]()
@@ -334,7 +334,7 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
         inc(stateNum)
         unmarked.add(newSPos)
         posS2DState[newSPos] = nState
-      tran[s][c] = nState
+      translations[s][c] = nState
 
   # make accepts
   var accepts = newDAccepts[T]()
@@ -352,38 +352,38 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
     echo "[nimly] done : make DFA"
   # make DFA
   return DFA[T](start: iState, accepts: accepts,
-                stateNum: stateNum, tran: tran)
+                stateNum: stateNum, translations: translations)
 
-proc statePartTran[T](state: DState, parts: seq[HashSet[DState]],
-                      dfa: DFA[T]): TableRef[char, DState] =
+proc statePartTranslations[T](state: DState, parts: seq[HashSet[DState]],
+                              dfa: DFA[T]): TableRef[char, DState] =
   result = newTable[char, DState]()
-  for c, s in dfa.tran[state]:
+  for c, s in dfa.translations[state]:
     for i, p in parts:
       if s in p:
         result[c] = DState(i)
         break
 
 proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
-  ## return true if grind effects
+  ## return true if this affects `parts`
   result = false
   var retParts: seq[HashSet[DState]] = @[]
   for setOfStates in parts:
     var subparts: seq[(HashSet[DState], TableRef[char, DState])] = @[]
     for state in setOfStates:
-      let sTran = state.statePartTran(parts, dfa)
+      let sTranslations = state.statePartTranslations(parts, dfa)
       var isNewPart = true
       for i, sp in subparts:
-        let (sos, tran) = sp
-        if sTran == tran:
+        let (sos, translations) = sp
+        if sTranslations == translations:
           var single = initHashSet[DState]()
           single.incl(state)
-          subparts[i] = (sos + single, tran)
+          subparts[i] = (sos + single, translations)
           isNewPart = false
           break
       if isNewPart:
         var single = initHashSet[DState]()
         single.incl(state)
-        subparts.add((single, sTran))
+        subparts.add((single, sTranslations))
 
     # add seq of state set to renew parts
     for sp in subparts:
@@ -394,7 +394,7 @@ proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
 
 proc removeDead[T](input: DFA[T]): DFA[T] =
   var dead = initHashSet[DState]()
-  for s, tr in input.tran:
+  for s, tr in input.translations:
     if input.accepts.haskey(s):
       continue
     var f = true
@@ -404,33 +404,36 @@ proc removeDead[T](input: DFA[T]): DFA[T] =
         break
     if f:
       dead.incl(s)
-  var newTran = newDTran()
-  for s, tr in input.tran:
+  var newTranslations = newDTranslations()
+  for s, tr in input.translations:
     if s in dead:
       continue
-    var newRow = newDTranRow()
+    var newRow = newDTranslationsRow()
     for c, ns in tr:
       if ns in dead:
         newRow[c] = deadState
       else:
         newRow[c] = ns
-    newTran[s] = newRow
+    newTranslations[s] = newRow
   result = DFA[T](
     start: input.start,
     accepts: input.accepts,
     stateNum: input.stateNum - dead.card,
-    tran: newTran
+    translations: newTranslations
   )
 
 proc minimizeStates[T](input: DFA[T],
-                       initPart: seq[HashSet[DState]]): DFA[T] =
+                       initPartition: seq[HashSet[DState]]): DFA[T] =
+  ## The main part of `minimizeStates*[T](input: DFA[T]): DFA[T]`.
+  ## `initPartiotion[0]` needs to be the state to accept.
   var
-    partition = initPart
+    partition = initPartition
     didChange = true
   while didChange:
     didChange = partition.grind(input)
 
-  result = DFA[T](tran: newDTran(), accepts: newDAccepts[T]())
+  result = DFA[T](translations: newDTranslations(),
+                  accepts: newDAccepts[T]())
   for i, p in partition:
     if input.start in p:
       result.start = i
@@ -439,17 +442,20 @@ proc minimizeStates[T](input: DFA[T],
         result.accepts[i] = input.accepts[acc]
     inc(result.stateNum)
     for s in p:
-      result.tran[i] = s.statePartTran(partition, input)
+      result.translations[i] = s.statePartTranslations(partition, input)
       break
 
   result = result.removeDead
 
 proc minimizeStates*[T](input: DFA[T]): DFA[T] =
-  ## needs all accepts correspond unique clause
+  ## Minimmize the state of DNF.
+  ## The algorithm is same to what is explained in DragonBook 3.9.7.
+  ## After despatch this function,
+  ## each states to accept in DFA needs to correspond to the unique clause.
   when defined(nimydebug):
     echo "[nimly] start : minimize lexer state"
   var
-    initPart: seq[HashSet[DState]] = @[]
+    initPartition: seq[HashSet[DState]] = @[]
     other = initHashSet[DState]()
   for i in 0..<input.stateNum:
     other.incl(i)
@@ -458,18 +464,19 @@ proc minimizeStates*[T](input: DFA[T]): DFA[T] =
     var single = initHashSet[DState]()
     single.incl(k)
     other.excl(k)
-    initPart.add(single)
-  initPart.add(other)
+    initPartition.add(single)
+  initPartition.add(other)
   when defined(nimldebug):
     echo "initPart\n--------"
     echo initPart
     echo "--------"
 
-  result = input.minimizeStates(initPart)
+  # The main part
+  result = input.minimizeStates(initPartition)
   when defined(nimydebug):
     echo "[nimly] done : minimize lexer state"
 
-proc defaultAndOther(dtr: DTranRow): (DState, DTranRow) =
+proc defaultAndOther(dtr: DTranslationsRow): (DState, DTranslationsRow) =
   var counts = newTable[DState, int]()
   for i in {0..255}:
     let s = dtr.getOrDefault(char(i), deadState)
@@ -485,14 +492,14 @@ proc defaultAndOther(dtr: DTranRow): (DState, DTranRow) =
       default = s
       maxCnt = c
 
-  var resultTranRow = newDTranRow()
+  var resultTranslationsRow = newDTranslationsRow()
 
   for i in {0..255}:
     let ns = dtr.getOrDefault(char(i), deadState)
     if ns != default:
-      resultTranRow[char(i)] = ns
+      resultTranslationsRow[char(i)] = ns
 
-  return (default, resultTranRow)
+  return (default, resultTranslationsRow)
 
 proc longestEmpty(nc: seq[NC]): (int, int) =
   ## return (start, length)
@@ -523,7 +530,7 @@ proc longestEmpty(nc: seq[NC]): (int, int) =
 
     return (maxStart, maxLen)
 
-proc minMaxCharIntOfRow(dtr: DTranRow): (int, int) =
+proc minMaxCharIntOfRow(dtr: DTranslationsRow): (int, int) =
   ## return (min, max)
   var
     resultMin = 256
@@ -553,14 +560,14 @@ proc convertToLexData*[T](dfa: DFA[T]): LexData[T] =
     # first element is starting state
     dbaTable: DBATable[T] = @[DBA[T]()]
     ncTable: NCTable = @[]
-    # state -> newState, base, newTran
-    stateTable = newTable[int, (int, int, DTranRow)]()
+    # state -> newState, base, newTranslations
+    stateTable = newTable[int, (int, int, DTranslationsRow)]()
   assert dbaTable.len == 1
-  for s, tr in dfa.tran:
+  for s, tr in dfa.translations:
     let
-      (default, newTranRow) = tr.defaultAndOther
+      (default, newTranslationsRow) = tr.defaultAndOther
       (ls, ll) = ncTable.longestEmpty
-      (minC, maxC) = newTranRow.minMaxCharIntOfRow
+      (minC, maxC) = newTranslationsRow.minMaxCharIntOfRow
     var
       start: int
       base: int
@@ -570,7 +577,7 @@ proc convertToLexData*[T](dfa: DFA[T]): LexData[T] =
       start = ls
     base = start - minC
 
-    for c, next in newTranRow:
+    for c, next in newTranslationsRow:
       # Dummy
       ncTable.writeRow(base + int(c),
                        DataRow(next = -2, check = -2))
@@ -583,10 +590,10 @@ proc convertToLexData*[T](dfa: DFA[T]): LexData[T] =
 
     let dba = DBA[T](default: default, base: base, accept: acc)
     if s == dfa.start:
-      stateTable[s] = (0, base, newTranRow)
+      stateTable[s] = (0, base, newTranslationsRow)
       dbaTable[0] = dba
     else:
-      stateTable[s] = (dbaTable.len, base, newTranRow)
+      stateTable[s] = (dbaTable.len, base, newTranslationsRow)
       dbaTable.add(dba)
   for k, v in stateTable:
     for c, next in v[2]:

@@ -30,7 +30,7 @@ let
       4: strid
       }.newTable,
     stateNum: 5,
-    tran: {
+    translations: {
       0: {'a': 1, 'b': 2}.newTable(),
       1: {'a': 1, 'b': 3}.newTable(),
       2: {'a': 1, 'b': 2}.newTable(),
@@ -69,16 +69,16 @@ test "test correctChar":
 
 template checkDFA[A](dfa: DFA[A]) =
   let
-    sa = dfa.tran[dfa.start]['a']
-    sab = dfa.tran[sa]['b']
-    acc = dfa.tran[sab]['b']
+    sa = dfa.translations[dfa.start]['a']
+    sab = dfa.translations[sa]['b']
+    acc = dfa.translations[sab]['b']
   check dfa.stateNum == 4
-  check dfa.tran[dfa.start]['b'] == dfa.start
-  check dfa.tran[sa]['a'] == sa
-  check dfa.tran[sab]['a'] == sa
+  check dfa.translations[dfa.start]['b'] == dfa.start
+  check dfa.translations[sa]['a'] == sa
+  check dfa.translations[sab]['a'] == sa
   check dfa.accepts.haskey(acc)
-  check dfa.tran[acc]['a'] == sa
-  check dfa.tran[acc]['b'] == dfa.start
+  check dfa.translations[acc]['a'] == sa
+  check dfa.translations[acc]['b'] == dfa.start
 
 test "test makeDFA (Dragonbook 3.9.5)":
   let dfa = makeDFA[string](dbookExampleLexRe)
@@ -138,9 +138,9 @@ test "test convertToLexData":
 proc doesAccept[T](dfa: DFA[T], str: string): bool =
   var state = dfa.start
   for c in str:
-    if (not dfa.tran[state].haskey(c)):
+    if (not dfa.translations[state].haskey(c)):
       return false
-    state = dfa.tran[state][c]
+    state = dfa.translations[state][c]
   return dfa.accepts.hasKey(state)
 
 proc finalState[T](ld: LexData[T], str: string): int =
