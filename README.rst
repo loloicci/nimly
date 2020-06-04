@@ -281,7 +281,7 @@ to print debug info.
 example: ``nim c -d:nimldebug -d:nimydebug -r tests/test_readme_example.nim``
 
 
-.. |azure_pipelines| image:: https://dev.azure.com/oxisccl/nimly/_apis/build/status/loloiccl.nimly?branchName=master
+.. |azure_pipelines| image:: https://dev.azure.com/oxisccl/nimly/_apis/build/status/loloicci.nimly?branchName=master
     :target: https://dev.azure.com/oxisccl/nimly/_build/latest?definitionId=1&branchName=master
 .. |nimble| image:: https://raw.githubusercontent.com/yglukhov/nimble-tag/master/nimble.png
     :target: https://github.com/yglukhov/nimble-tag
