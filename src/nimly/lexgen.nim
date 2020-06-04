@@ -354,45 +354,45 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
   return DFA[T](start: iState, accepts: accepts,
                 stateNum: stateNum, translations: translations)
 
-proc calculateTableCharsToNextPartitions[T](
+proc calculateTableCharsToNextState[T](
   state: DState,
-  partitions: seq[HashSet[DState]],
+  partition: seq[HashSet[DState]],
   dfa: DFA[T]): TableRef[char, DState] =
   result = newTable[char, DState]()
   for c, s in dfa.translations[state]:
-    for i, p in partitions:
+    for i, p in partition:
       if s in p:
         result[c] = DState(i)
         break
 
-proc grind[T](parts: var seq[HashSet[DState]], dfa: DFA[T]): bool =
-  ## return true if this affects `parts`
+proc grind[T](partition: var seq[HashSet[DState]], dfa: DFA[T]): bool =
+  ## return true if this affects `partition`
   result = false
-  var retParts: seq[HashSet[DState]] = @[]
-  for setOfStates in parts:
-    var subparts: seq[(HashSet[DState], TableRef[char, DState])] = @[]
-    for state in setOfStates:
-      let sTranslations = state.calculateTableCharsToNextPartitions(parts, dfa)
+  var newPartition: seq[HashSet[DState]] = @[]
+  for group in partition:
+    # seq of (subgroup, translationsFromThisSubgroup)
+    var grindedDFA: seq[(HashSet[DState], TableRef[char, DState])] = @[]
+    for state in group:
+      let translationsFromState = state.calculateTableCharsToNextState(
+        partition, dfa
+      )
       var isNewPart = true
-      for i, sp in subparts:
-        let (sos, translations) = sp
-        if sTranslations == translations:
-          var single = initHashSet[DState]()
-          single.incl(state)
-          subparts[i] = (sos + single, translations)
+      for i, subgroupData in grindedDFA:
+        let (subgroup, translationsFromSubgroup) = subgroupData
+        if translationsFromState == translationsFromSubgroup:
+          grindedDFA[i] = (subgroup + [state].toHashSet, translationsFromSubgroup)
           isNewPart = false
           break
       if isNewPart:
-        var single = initHashSet[DState]()
-        single.incl(state)
-        subparts.add((single, sTranslations))
+        grindedDFA.add(([state].toHashSet, translationsFromState))
 
     # add seq of state set to renew parts
-    for sp in subparts:
-      retParts.add(sp[0])
-    if subparts.len > 1:
+    for subgroupData in grindedDFA:
+      let (subgroup, _) = subgroupData
+      newPartition.add(subgroup)
+    if grindedDFA.len > 1:
       result = true
-  parts = retParts
+  partition = newPartition
 
 proc removeDead[T](input: DFA[T]): DFA[T] =
   var dead = initHashSet[DState]()
@@ -444,8 +444,8 @@ proc minimizeStates[T](input: DFA[T],
         result.accepts[i] = input.accepts[acc]
     inc(result.stateNum)
     for s in p:
-      result.translations[i] = s.calculateTableCharsToNextPartitions(partition,
-                                                                     input)
+      result.translations[i] = s.calculateTableCharsToNextState(partition,
+                                                                input)
       break
 
   result = result.removeDead
@@ -453,8 +453,8 @@ proc minimizeStates[T](input: DFA[T],
 proc minimizeStates*[T](input: DFA[T]): DFA[T] =
   ## Minimmize the state of DNF.
   ## The algorithm is same to what is explained in DragonBook 3.9.7.
-  ## After despatch this function,
-  ## each states to accept in DFA needs to correspond to the unique clause.
+  ## After despatch this function, each states to accept in DFA
+  ## needs to correspond to the unique clause in partition.
   when defined(nimydebug):
     echo "[nimly] start : minimize lexer state"
   var
