@@ -262,9 +262,7 @@ proc augument*[T](g: Grammar[T]): Grammar[T] =
     result.firstTable = result.makeFirstTable
     result.followTable = result.makeFollowTable
     return
-  var singleStart = initHashSet[Rule[T]]()
-  singleStart.incl(startRule)
-  let newRules = g.rules + singleStart
+  let newRules = g.rules + [startRule].toHashSet()
   result = initGrammar(newRules, start)
   result.firstTable = result.makeFirstTable
   result.followTable = result.makeFollowTable
