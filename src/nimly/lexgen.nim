@@ -464,10 +464,8 @@ proc minimizeStates*[T](input: DFA[T]): DFA[T] =
     other.incl(i)
 
   for k in input.accepts.keys:
-    var single = initHashSet[DState]()
-    single.incl(k)
+    initPartition.add([k].toHashSet)
     other.excl(k)
-    initPartition.add(single)
   initPartition.add(other)
   when defined(nimldebug):
     echo "initPart\n--------"
