@@ -451,10 +451,11 @@ proc minimizeStates[T](input: DFA[T],
   result = result.removeDead
 
 proc minimizeStates*[T](input: DFA[T]): DFA[T] =
-  ## Minimmize the state of DNF.
-  ## The algorithm is same to what is explained in DragonBook 3.9.7.
-  ## After despatch this function, each states to accept in DFA
-  ## needs to correspond to the unique clause in partition.
+  ## Minimize the state of DNF.
+  ##
+  ## The algorithm is the same as what is explained in DragonBook 3.9.7.
+  ## After despatching this function, each states to accept in DFA
+  ## needs to correspond to the unique clause in the partition.
   when defined(nimydebug):
     echo "[nimly] start : minimize lexer state"
   var
