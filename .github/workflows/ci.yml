@@ -1,0 +1,12 @@
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: nimlang/nim:latest
+    steps:
+      - name: Nimble Test
+        run: nimble test
