@@ -1,0 +1,21 @@
+name: test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache nimble
+        id: cache-nimble
+        uses: actions/cache@v2
+        with:
+          path: ~/.nimble
+          key: ${{ runner.os }}-nimble-${{ hashFiles('*.nimble') }}
+      - uses: jiro4989/setup-nim-action@v1
+      - run: nimble test -y
