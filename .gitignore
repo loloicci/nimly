@@ -7,3 +7,5 @@
 # Private directories and files (IDEs)
 .*/
 ~*
+
+!.github
