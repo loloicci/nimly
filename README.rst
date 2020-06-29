@@ -259,7 +259,11 @@ Now, you can use nimly with ``import nimly``.
 
 vmdef.MaxLoopIterations Problem
 -------------------------------
-See https://github.com/loloiccl/nimly/issues/11
+During compiling lexer/parser, you can encounter errors with `interpretation requires too many iterations`.
+You can avoid this error to use the compiler option `maxLoopIterationsVM:N`
+which is available since nim v1.0.6.
+
+See https://github.com/loloiccl/nimly/issues/11 to detail.
 
 Contribute
 ==========
