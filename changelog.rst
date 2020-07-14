@@ -7,7 +7,7 @@
 
 Fixed
 -----
-* Issue #51 - [^...] in regex used  does not work.
+* Issue #51 - [^...] in regex used in niml does not work.
 
 Other
 -----
