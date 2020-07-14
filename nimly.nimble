@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.6.0"
+version       = "0.6.1"
 author        = "loloicci"
 description   = "Lexer Generator and Parser Generator as a library in Nim."
 license       = "MIT"
