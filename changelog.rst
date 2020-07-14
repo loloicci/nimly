@@ -2,12 +2,17 @@
  Changelog
 ###########
 
-Unreleased
-==========
+[v0.6.1] - 2020-07-14
+=====================
 
 Fixed
 -----
+* Issue #51 - [^...] in regex used does not work.
+
+Other
+-----
 * Do some Refactorings.
+* Rewrite about MaxLoopIteratios problem in README.
 
 [v0.6.0] - 2020-05-22
 =====================
