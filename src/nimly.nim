@@ -7,6 +7,7 @@ import nimly/lr
 import nimly/lalr
 import nimly/parsegen
 
+export lextypes.LexError
 export lextypes.LToken
 export lextypes.LexData
 

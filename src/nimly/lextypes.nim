@@ -1,6 +1,9 @@
 import patty
 
 type
+  LexError* = object of Exception
+
+type
   State* = int
   CInt* = int
 

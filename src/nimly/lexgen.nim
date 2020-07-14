@@ -120,6 +120,16 @@ proc accPos*(t: ReSynTree): seq[Pos] =
     result = t.accPosImplDebug.deduplicate
     doassert result.len > 0, "No acc node"
 
+
+proc `$`(t: ReSynTree): string =
+  match t:
+    Term(l):
+      $l
+    Bin(op, l, r):
+      $op & "(" & $(l[]) & ", \n" & $(r[]) & ")"
+    Star(c):
+      "*(" & $(c[]) & ")"
+
 proc reassignPos(t: ReSynTree, nextPos: var int): ReSynTree =
   match t:
     Term(lit: l):
@@ -132,13 +142,13 @@ proc reassignPos(t: ReSynTree, nextPos: var int): ReSynTree =
           return
     Bin(op: op, left: l, right: r):
       let
-        left = ~l[].reassignPos(nextPos)
-        right = ~r[].reassignPos(nextPos)
+        left = ~(l[].reassignPos(nextPos))
+        right = ~(r[].reassignPos(nextPos))
       return Bin(op = op,
                  left = left,
                  right = right)
     Star(child: c):
-      return Star(child = ~c[].reassignPos(nextPos))
+      return Star(child = ~(c[].reassignPos(nextPos)))
 
 proc collectChar(t: ReSynTree): set[char] =
   result = {}
@@ -292,7 +302,7 @@ proc makeCharPossetTable(t: ReSynTree): TableRef[char, HashSet[Pos]] =
         continue
 
 proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
-  when defined(nimydebug):
+  when defined(nimldebug):
     echo "[nimly] start : make DFA"
 
   let
@@ -348,7 +358,7 @@ proc makeDFA*[T](lr: LexRe[T]): DFA[T] =
     if mp != high(int):
       accepts[posS2DState[k]] = (lr.accPosProc[mp])
 
-  when defined(nimydebug):
+  when defined(nimldebug):
     echo "[nimly] done : make DFA"
   # make DFA
   return DFA[T](start: iState, accepts: accepts,
@@ -456,7 +466,7 @@ proc minimizeStates*[T](input: DFA[T]): DFA[T] =
   ## The algorithm is the same as what is explained in DragonBook 3.9.7.
   ## After despatching this function, each states to accept in DFA
   ## needs to correspond to the unique clause in the partition.
-  when defined(nimydebug):
+  when defined(nimldebug):
     echo "[nimly] start : minimize lexer state"
   var
     initPartition: seq[HashSet[DState]] = @[]
@@ -469,13 +479,13 @@ proc minimizeStates*[T](input: DFA[T]): DFA[T] =
     other.excl(k)
   initPartition.add(other)
   when defined(nimldebug):
-    echo "initPart\n--------"
-    echo initPart
+    echo "initPartition\n--------"
+    echo initPartition
     echo "--------"
 
   # The main part
   result = input.minimizeStates(initPartition)
-  when defined(nimydebug):
+  when defined(nimldebug):
     echo "[nimly] done : minimize lexer state"
 
 proc defaultAndOther(dtr: DTranslationsRow): (DState, DTranslationsRow) =
@@ -485,6 +495,9 @@ proc defaultAndOther(dtr: DTranslationsRow): (DState, DTranslationsRow) =
     if not counts.hasKey(s):
       counts[s] = 0
     inc(counts[s])
+
+  when defined(niml_debug):
+    echo "defaultAndOther - counts:" & $counts
 
   var
     default: DState
@@ -556,8 +569,15 @@ proc writeRow(ncTable: var NCTable, index: int, nc: NC, force = false) =
     ncTable[index] = nc
 
 proc convertToLexData*[T](dfa: DFA[T]): LexData[T] =
-  when defined(nimydebug):
+  when defined(nimldebug):
     echo "[nimly] start : make lexer table"
+    echo "    dfa.start: " & $dfa.start
+    echo "    dfa.translations: " & $dfa.translations
+    var keys = "("
+    for k in dfa.accepts.keys:
+      keys = keys & $k & ", "
+    keys = keys[0..^3] & ")"
+    echo "    dfa.accepts: " & $keys
   var
     # first element is starting state
     dbaTable: DBATable[T] = @[DBA[T]()]
@@ -590,6 +610,7 @@ proc convertToLexData*[T](dfa: DFA[T]): LexData[T] =
     else:
       acc = NotAcc[T]()
 
+    # default is a temporal value.
     let dba = DBA[T](default: default, base: base, accept: acc)
     if s == dfa.start:
       stateTable[s] = (0, base, newTranslationsRow)
@@ -597,15 +618,36 @@ proc convertToLexData*[T](dfa: DFA[T]): LexData[T] =
     else:
       stateTable[s] = (dbaTable.len, base, newTranslationsRow)
       dbaTable.add(dba)
+
+  when defined(nimldebug):
+    echo "    calculated stateTable: " & $stateTable
+    echo "    calculated dbaTable: " & $dbaTable
+
   for k, v in stateTable:
     for c, next in v[2]:
+      let nextState = if next == deadState:
+                        deadState
+                      else:
+                        stateTable[next][0]
       ncTable.writeRow(v[1] + int(c),
                        DataRow(
-                         next = stateTable[next][0],
+                         next = nextState,
                          check = v[0]),
                        force = true)
 
-  when defined(nimydebug):
+  # renew dbaTable's default state
+  for i in 0..<dbaTable.len:
+    if dbaTable[i].default != deadState:
+      dbaTable[i].default = stateTable[dbaTable[i].default][0]
+
+    when defined(niml_debug):
+      echo "----dbaRow-->>"
+      echo "default: " & $dbaTable[i].default
+      echo "base: " & $dbaTable[i].base
+      echo "accept: " & $dbaTable[i].accept.kind
+      echo "<<--dbaRow----"
+
+  when defined(nimldebug):
     echo "[nimly] done : make lexer table"
   return LexData[T](dba: dbaTable, nc: ncTable)
 
@@ -640,7 +682,8 @@ variant RePart:
   Tree(tree: ReSynTree)
 
 const
-  allChars = {char(0)..char(255)}
+  # char(0) is EOF
+  allChars = {char(1)..char(255)}
   dChars = {'0'..'9'}
   nDChars = allChars - dChars
   sChars = {' ', '\t', '\n', '\r', '\f', '\v'}
@@ -793,6 +836,11 @@ proc convertToSeqRePart(re: string): seq[RePart] =
           result.add(Special(sc=c))
         else:
           result.add(RChar(c=c))
+  when defined(niml_tree_debug):
+    echo "ReTreeParts\n--------"
+    echo result
+    echo "--------\n"
+
 
 proc toTree(input: RePart): ReSynTree =
   match input:

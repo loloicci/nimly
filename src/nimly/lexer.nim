@@ -70,9 +70,11 @@ proc lex*[T](nl: var NimlLexer[T]): T =
       lastAccState = state
       lastAccPos = pos
       lastAccLine = nl.lineNumber
-    assert c != EndOfFile or state == -1, "invalid EOF while lexing"
+    if c == EndOfFile and lastAccState == -1:
+      raise newException(LexError, "invalid EOF while lexing")
 
-  doassert lastAccState != deadState, "LexError:\n" & lineInfo
+  if lastAccState == -1:
+    raise newException(LexError, "LexError:\n" & lineInfo)
 
   ltoken.token = lastAccToken
 
