@@ -12,7 +12,7 @@ so you can use ``nimly`` not as external tool of your program but as a library.
 
 niml
 ====
-``niml`` is a lexer generator work in Nim-lang.
+``niml`` is a macro to generate a lexer.
 
 macro niml
 ----------
@@ -70,7 +70,7 @@ Each of followings is recognized as character set.
 
 nimy
 ====
-``nimy`` is a LALR(1) parser generator work in Nim-lang.
+``nimy`` is a macro to generate a LALR(1) parser.
 
 macro nimy
 ----------
