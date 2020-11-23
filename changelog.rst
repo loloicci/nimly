@@ -2,6 +2,13 @@
  Changelog
 ###########
 
+Unreleased
+==========
+
+Other
+-----
+* remove functions toConst and reconstruct
+
 [v0.6.1] - 2020-07-14
 =====================
 
