@@ -666,7 +666,8 @@ macro nimy*(head, body: untyped): untyped =
       continue
     let (nonTerm, rType) = parseLeft(clause)
     doAssert (not (nimyInfo.haskey(nonTerm))), "some nonterm are duplicated"
-    nimyInfo[nonTerm] = initNimyRow(NonTerm, rtn = rType, rtp = genSym())
+    nimyInfo[nonTerm] = initNimyRow(NonTerm, rtn = rType,
+                                    rtp = genSym(nskConst))
     if first:
       topNonTerm = nonTerm
       topNonTermNode = nnkCall.newTree(
@@ -679,7 +680,8 @@ macro nimy*(head, body: untyped): untyped =
       returnType = rType
       first = false
   nimyInfo["__Start__"] = initNimyRow(NonTerm,
-                                      rtn = returnType, rtp = genSym())
+                                      rtn = returnType,
+                                      rtp = genSym(nskConst))
 
   # make opt and rep
   var optAndRep: seq[NimNode] = @[]
@@ -717,7 +719,9 @@ macro nimy*(head, body: untyped): untyped =
             nr = nimyInfo[innerSym]
 
           optAndRep.add(getOpt(newIdentNode(innerSym), ty, new))
-          nimyInfo[newStr] = initNimyRow(NonTerm, rtn = rt, rtp = genSym())
+          nimyInfo[newStr] = initNimyRow(NonTerm,
+                                         rtn = rt,
+                                         rtp = genSym(nskConst))
           nimyInfo[innerSym] = NimyRow(
             kind: nr.kind,
             retTyNode: nr.retTyNode,
@@ -746,9 +750,9 @@ macro nimy*(head, body: untyped): untyped =
 
           optAndRep.add(getRep(newIdentNode(innerSym), ty, new, newInner))
           nimyInfo[newStr] = initNimyRow(NonTerm, rtn = rt,
-                                         rtp = genSym())
+                                         rtp = genSym(nskConst))
           nimyInfo[newInnerStr] = initNimyRow(NonTerm, rtn = rt,
-                                              rtp = genSym())
+                                              rtp = genSym(nskConst))
           nimyInfo[innerSym] = NimyRow(
             kind: nr.kind,
             retTyNode: nr.retTyNode,
@@ -808,13 +812,13 @@ macro nimy*(head, body: untyped): untyped =
         (ruleMaker, argTypes, clauseBody) = parseRuleAndBody(
           ruleClause, tokenKind, tokenType, left, nimyInfo
         )
-        ruleId = genSym()
+        ruleId = genSym(nskConst)
         ruleProcId = if i == 0:
                        topProcId
                      else:
                        genSym(nskProc)
       ruleIds.add(ruleId)
-      let ruleDef = newLetStmt(
+      let ruleDef = newConstStmt(
         ruleId,
         ruleMaker
       )
@@ -847,23 +851,24 @@ macro nimy*(head, body: untyped): untyped =
         )
       )
     # ruleToProcMakerDef
-    let ruleToProcMakerName = genSym(nskProc)
-    var ruleToProcMakerNode = newProc(
-      ruleToProcMakerName,
-      @[nnkBracketExpr.newTree(
-        newIdentNode("RuleToProc"),
-        tokenType,
-        tokenKind,
-        rType
-      )],
-      ruleToProcMakerBody
-    )
+    let
+      ruleToProcMakerName = genSym(nskProc)
+      ruleToProcMakerNode = newProc(
+        ruleToProcMakerName,
+        @[nnkBracketExpr.newTree(
+          newIdentNode("RuleToProc"),
+          tokenType,
+          tokenKind,
+          rType
+        )],
+        ruleToProcMakerBody
+      )
     ruleToProcMakers.add(
       ruleToProcMakerNode
     )
     # add table to result
     tableConstDefs.add(
-      newLetStmt(
+      newConstStmt(
         nimyInfo[nonTerm].ruleToProc,
         nnkCall.newTree(
           ruleToProcMakerName
@@ -901,22 +906,25 @@ macro nimy*(head, body: untyped): untyped =
     tableMakerProc(tmpName, tokenType, tokenKind, topNonTermNode, tableMaker,
                    ruleIds, ruleDefs, symNodes)
   )
-  var tableName: NimNode
   when defined(nimylet):
-    tableName = genSym()
     result.add(
       newLetStmt(
-        tableName,
+        nnkPostfix.newTree(
+          newIdentNode("*"),
+          parserName,
+        ),
         nnkCall.newTree(
           tmpName
         )
       )
     )
   else:
-    tableName = genSym(nskConst)
     result.add(
       newConstStmt(
-        tableName,
+        nnkPostfix.newTree(
+          newIdentNode("*"),
+          parserName,
+        ),
         nnkCall.newTree(
           tmpName
         )
@@ -928,22 +936,6 @@ macro nimy*(head, body: untyped): untyped =
     itr = genSym(nskVar)
 
   result.add(ruleDefs)
-
-  result.add(
-    newVarStmt(
-      nnkPostfix.newTree(
-        newIdentNode("*"),
-        parserName
-      ),
-      nnkCall.newTree(
-        nnkBracketExpr.newTree(
-          newIdentNode("newParser"),
-          tokenKind
-        ),
-        tableName
-      )
-    )
-  )
 
   # add proc parse
   result.add(

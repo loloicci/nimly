@@ -9,11 +9,11 @@ import parser_415_lr
 test "test lalr":
   var lexer415 = lex415.newWithString("left")
   lexer415.ignoreIf = proc(r: MyTerm): bool = r.kind == MyTermKind.IGNORE
-  psr415LALR.init
-  check parser_415.parse(psr415LALR, lexer415) == "left"
+  var parser = psr415LALR.newParser()
+  check parser_415.parse(parser, lexer415) == "left"
 
 test "test lr":
   var lexer415 = lex415.newWithString("left")
   lexer415.ignoreIf = proc(r: MyTerm): bool = r.kind == MyTermKind.IGNORE
-  psr415LR.init
-  check parser_415_lr.parse(psr415LR, lexer415) == "left"
+  var parser = psr415LR.newParser()
+  check parser_415_lr.parse(parser, lexer415) == "left"

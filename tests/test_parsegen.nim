@@ -67,8 +67,8 @@ test "test 1":
 test "test 2":
   var testLexer = testLex.newWithString("1 + 2 * 3")
   testLexer.ignoreIf = proc(r: MyToken): bool = r.kind == MyTokenKind.IGNORE
-  testPar.init()
-  check testPar.parse(testLexer) == "1 + (2 * 3)"
+  var parser = testPar.newParser()
+  check parser.parse(testLexer) == "1 + (2 * 3)"
   testLexer.initWithString("1 + 2 * 3")
-  testPar.init()
-  check testPar.parse(testLexer) == "1 + (2 * 3)"
+  parser.init()
+  check parser.parse(testLexer) == "1 + (2 * 3)"

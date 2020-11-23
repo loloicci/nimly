@@ -175,6 +175,7 @@ proc parseImpl*[T, S](parser: var Parser[S],
 
 proc newParser*[T](t: ParsingTable[T]): Parser[T] =
   result = Parser[T](stack: @[0], table: t)
+  result.init()
 
 proc init*[T](p: var Parser[T]) =
   p.stack = @[0]
