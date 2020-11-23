@@ -5,6 +5,10 @@
 Unreleased
 ==========
 
+Changed
+-------
+* change the design and how to use ``nimy`` (#59, #60)
+
 Other
 -----
 * remove functions toConst and reconstruct
