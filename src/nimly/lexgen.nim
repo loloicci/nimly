@@ -977,6 +977,10 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
 
   # init part
 
+  # setUp, tearDown function
+  var setUpProc: seq[(NimNode, NimNode)] = @[]
+  var tearDownProc: seq[(NimNode, NimNode)] = @[]
+
   # var app = newAccPosProc[T]()
   let app = genSym(nskVar)
   lexerMakerBody.add(
@@ -1046,10 +1050,37 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
 
   # clause parser
   proc parseClause(clause: NimNode, first: bool,
-                   lexerMakerBody: var NimNode, procs: var seq[NimNode]) =
+                   lexerMakerBody: var NimNode,
+                   setUpProc: var seq[(NimNode, NimNode)],
+                   tearDownProc: var seq[(NimNode, NimNode)],
+                   procs: var seq[NimNode]) =
+
+    # setUp, tearDown parser
+    proc parseSetUpTearDown(body: NimNode,
+                            procVar: var seq[(NimNode, NimNode)]) =
+      doAssert procVar.len == 0, "Multiple definition of setUp or tearDown"
+      let name = genSym(nskProc)
+      let procNode = newProc(
+        name = name,
+        params = @[newEmptyNode()],
+        body = body
+      )
+      procVar.add((name, procNode))
+
     clause.expectKind(nnkCall)
-    clause[0].expectKind({nnkRStrLit, nnkStrLit})
+    clause[0].expectKind({nnkRStrLit, nnkStrLit, nnkIdent})
     clause[1].expectKind(nnkStmtList)
+
+    # parse setup or teardown clause
+    if clause[0].kind == nnkIdent:
+      doAssert $clause[0] == "setUp" or $clause[0] == "tearDown"
+      if $clause[0] == "setUp":
+        parseSetUpTearDown(clause[1], setUpProc)
+      else:
+        parseSetUpTearDown(clause[1], tearDownProc)
+      return
+
+    # parse normal clause
     let
       param = newTree(nnkIdentDefs,
                       newIdentNode("token"),
@@ -1147,10 +1178,31 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
   for clause in body:
     if clause.kind == nnkCommentStmt:
       continue
-    clause.parseClause(first, lexerMakerBody, procs)
+    clause.parseClause(first, lexerMakerBody,
+                       setUpProc, tearDownProc, procs)
     first = false
 
-    # make tail of lexerMakerBody
+  if setUpProc.len == 0:
+    let procDoNothing = genSym(nskProc)
+    let procDoNothingNode = newProc(
+        name = procDoNothing,
+        params = @[newEmptyNode()],
+        body = nnkDiscardStmt.newTree(newEmptyNode())
+    )
+
+    setUpProc.add((procDoNothing, procDoNothingNode))
+
+  if tearDownProc.len == 0:
+    let procDoNothing = genSym(nskProc)
+    let procDoNothingNode = newProc(
+        name = procDoNothing,
+        params = @[newEmptyNode()],
+        body = nnkDiscardStmt.newTree(newEmptyNode())
+    )
+
+    tearDownProc.add((procDoNothing, procDoNothingNode))
+
+  # make tail of lexerMakerBody
 
   # let lr = LexRe[(meta typeId)](st: wholeRst, accPosProc: app)
   let lrId = genSym()
@@ -1235,6 +1287,30 @@ proc makeLexerMakerBody(typeId, body: NimNode): (NimNode, seq[NimNode]) =
           newIdentNode("convertToLexData"),
           minimizedDfa
         )
+      )
+    )
+  )
+
+  # setUp, tearDown
+  doAssert setUpProc.len == 1
+  doAssert tearDownProc.len == 1
+  procs.add(setUpProc[0][1])
+  procs.add(tearDownProc[0][1])
+  lexerMakerBody.add(
+    nnkStmtList.newTree(
+      nnkAsgn.newTree(
+        nnkDotExpr.newTree(
+          newIdentNode("result"),
+          newIdentNode("setUp")
+        ),
+        setUpProc[0][0]
+      ),
+      nnkAsgn.newTree(
+        nnkDotExpr.newTree(
+          newIdentNode("result"),
+          newIdentNode("tearDown")
+        ),
+        tearDownProc[0][0]
       )
     )
   )

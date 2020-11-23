@@ -36,6 +36,8 @@ type
   LexData*[T] = object
     dba*: DBATable[T]
     nc*: NCTable
+    setUp*: proc() {.nimcall.}
+    tearDown*: proc() {.nimcall.}
 
 const
   deadState* = -1

@@ -11,12 +11,20 @@ type
   NimlError* = object of Exception
   NimlEOFError* = object of NimlError
 
+proc newNimlLexer[T](data: LexData[T]): NimlLexer[T] =
+  result = NimlLexer[T](
+    data: data,
+    ignoreIf: proc(r: T): bool = false,
+  )
+
 proc open*[T](data: LexData[T], path: string): NimlLexer[T] =
-  result = NimlLexer[T](data: data)
+  result = newNimlLexer(data)
+  data.setUp()
   result.open(openFileStream(path))
 
 proc newWithString*[T](data: LexData[T], str: string): NimlLexer[T] =
-  result = NimlLexer[T](data: data)
+  result = newNimlLexer(data)
+  data.setUp()
   result.open(newStringStream(str))
 
 proc open*[T](lexer: var NimlLexer[T], path: string) =
@@ -25,7 +33,9 @@ proc open*[T](lexer: var NimlLexer[T], path: string) =
 proc initWithString*[T](lexer: var NimlLexer[T], str: string) =
   lexer.open(newStringStream(str))
 
-export lexbase.close
+proc close*[T](lexer: var NimlLexer[T]) =
+  lexer.data.tearDown()
+  lexbase.close(lexer)
 
 proc lex*[T](nl: var NimlLexer[T]): T =
   let
