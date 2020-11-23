@@ -719,7 +719,9 @@ macro nimy*(head, body: untyped): untyped =
             nr = nimyInfo[innerSym]
 
           optAndRep.add(getOpt(newIdentNode(innerSym), ty, new))
-          nimyInfo[newStr] = initNimyRow(NonTerm, rtn = rt, rtp = genSym())
+          nimyInfo[newStr] = initNimyRow(NonTerm,
+                                         rtn = rt,
+                                         rtp = genSym(nskConst))
           nimyInfo[innerSym] = NimyRow(
             kind: nr.kind,
             retTyNode: nr.retTyNode,
@@ -748,9 +750,9 @@ macro nimy*(head, body: untyped): untyped =
 
           optAndRep.add(getRep(newIdentNode(innerSym), ty, new, newInner))
           nimyInfo[newStr] = initNimyRow(NonTerm, rtn = rt,
-                                         rtp = genSym())
+                                         rtp = genSym(nskConst))
           nimyInfo[newInnerStr] = initNimyRow(NonTerm, rtn = rt,
-                                              rtp = genSym())
+                                              rtp = genSym(nskConst))
           nimyInfo[innerSym] = NimyRow(
             kind: nr.kind,
             retTyNode: nr.retTyNode,
