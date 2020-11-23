@@ -33,8 +33,7 @@ export parsetypes.`$`
 export parser.ParseTree
 export parser.ConstTable
 export parser.Parser
-export parser.toConst
-export parser.reconstruct
+export parser.ParsingTable
 export parser.parseImpl
 export parser.newParser
 export parser.init

@@ -473,10 +473,9 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm,
       )
     )
   )
-  let tmpTable = genSym()
   body.add(
-    newLetStmt(
-      tmpTable,
+    nnkAsgn.newTree(
+      newIdentNode("result"),
       nnkCall.newTree(
         nnkBracketExpr.newTree(
           tableMaker,
@@ -486,45 +485,15 @@ proc tableMakerProc(name, tokenType, tokenKind, topNonTerm,
       )
     )
   )
-  let stiId = genSym(nskVar)
-  body.addVarSymToInt(stiId, tokenKind, syms)
-  let rtiId = genSym(nskVar)
-  body.addRuleToInt(rtiId, tokenKind, rules)
-  body.add(
-    nnkAsgn.newTree(
-      newIdentNode("result"),
-      nnkCall.newTree(
-        nnkBracketExpr.newTree(
-          newIdentNode("toConst"),
-          tokenKind
-        ),
-        tmpTable,
-        stiId,
-        rtiId
-      )
-    )
-  )
-
-  body.add(
-    nnkWhenStmt.newTree(
-      nnkElifBranch.newTree(
-        nnkCall.newTree(
-          newIdentNode("defined"),
-          newIdentNode("nimlydebug")
-        ),
-        nnkStmtList.newTree(
-          nnkCommand.newTree(
-            newIdentNode("echo"),
-            newLit("END: makeing the Parser")
-          )
-        )
-      )
-    )
-  )
 
   result = newProc(
     name,
-    @[newIdentNode("ConstTable")],
+    @[
+      nnkBracketExpr.newTree(
+        newIdentNode("ParsingTable"),
+        tokenKind
+      )
+    ],
     body
   )
 
@@ -932,22 +901,22 @@ macro nimy*(head, body: untyped): untyped =
     tableMakerProc(tmpName, tokenType, tokenKind, topNonTermNode, tableMaker,
                    ruleIds, ruleDefs, symNodes)
   )
-  var constTableName: NimNode
+  var tableName: NimNode
   when defined(nimylet):
-    constTableName = genSym()
+    tableName = genSym()
     result.add(
       newLetStmt(
-        constTableName,
+        tableName,
         nnkCall.newTree(
           tmpName
         )
       )
     )
   else:
-    constTableName = genSym(nskConst)
+    tableName = genSym(nskConst)
     result.add(
       newConstStmt(
-        constTableName,
+        tableName,
         nnkCall.newTree(
           tmpName
         )
@@ -957,25 +926,8 @@ macro nimy*(head, body: untyped): untyped =
   let
     its = genSym(nskVar)
     itr = genSym(nskVar)
-    letTable = genSym()
 
   result.add(ruleDefs)
-  result.addVarIntToSym(its, tokenKind, symNodes)
-  result.addIntToRule(itr, tokenKind, ruleIds)
-  result.add(
-    newLetStmt(
-      letTable,
-      newCall(
-        nnkBracketExpr.newTree(
-          newIdentNode("reconstruct"),
-          tokenKind
-        ),
-        constTableName,
-        its,
-        itr
-      )
-    )
-  )
 
   result.add(
     newVarStmt(
@@ -988,7 +940,7 @@ macro nimy*(head, body: untyped): untyped =
           newIdentNode("newParser"),
           tokenKind
         ),
-        letTable
+        tableName
       )
     )
   )
