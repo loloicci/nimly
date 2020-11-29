@@ -7,7 +7,7 @@ variantp Token:
   Indent(level: int)
   Num(str: string)
 
-var indStack {.global.}: seq[int] = @[]
+var indStack* {.global.}: seq[int] = @[]
 
 niml lexGlobalVar[Token]:
   setUp:
@@ -23,6 +23,9 @@ niml lexGlobalVar[Token]:
       var top = indStack.pop()
       while top > spaces:
         top = indStack.pop()
-      assert top == spaces
       indStack.add(top)
-      return Indent(indStack.len - 1)
+      if top == spaces:
+        return Indent(indStack.len - 1)
+      else:
+        indStack.add(spaces)
+        return Indent(indStack.len - 1)

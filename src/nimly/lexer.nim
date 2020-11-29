@@ -8,6 +8,8 @@ type
   NimlLexer*[T] = object of BaseLexer
     data*: LexData[T]
     ignoreIf*: proc(r: T): bool
+    setUp*: proc() {.nimcall.}
+    tearDown*: proc() {.nimcall.}
   NimlError* = object of Exception
   NimlEOFError* = object of NimlError
 
@@ -15,23 +17,27 @@ proc newNimlLexer[T](data: LexData[T]): NimlLexer[T] =
   result = NimlLexer[T](
     data: data,
     ignoreIf: proc(r: T): bool = false,
+    setUp: data.setUp,
+    tearDown: data.tearDown,
   )
 
 proc open*[T](data: LexData[T], path: string): NimlLexer[T] =
   result = newNimlLexer(data)
-  data.setUp()
   result.open(openFileStream(path))
+  result.setUp()
 
 proc newWithString*[T](data: LexData[T], str: string): NimlLexer[T] =
   result = newNimlLexer(data)
-  data.setUp()
   result.open(newStringStream(str))
+  result.setUp()
 
 proc open*[T](lexer: var NimlLexer[T], path: string) =
   lexer.open(openFileStream(path))
+  lexer.setUp()
 
 proc initWithString*[T](lexer: var NimlLexer[T], str: string) =
   lexer.open(newStringStream(str))
+  lexer.setUp()
 
 proc close*[T](lexer: var NimlLexer[T]) =
   lexer.data.tearDown()
