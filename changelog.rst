@@ -2,16 +2,20 @@
  Changelog
 ###########
 
-Unreleased
-==========
+[v0.7.0] - 2021-01-23
+=====================
+
+Added
+-----
+* Add function to define ``setUp`` and ``tearDown`` in niml (#54)
 
 Changed
 -------
-* change the design and how to use ``nimy`` (#59, #60)
+* Change the design and how to use ``nimy`` (#59, #60)
 
 Other
 -----
-* remove functions toConst and reconstruct
+* Remove functions toConst and reconstruct
 
 [v0.6.1] - 2020-07-14
 =====================
