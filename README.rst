@@ -38,6 +38,15 @@ Example is as follows.
     ## you can use ``..`` instead of ``-`` in ``[]``.
     r"[a..zA..Z\-_][a..zA..Z0..9\-_]*":
       return TokenIdentifier(token)
+    ## you can define ``setUp`` and ``tearDown`` function.
+    ## ``setUp`` is called from ``open``, ``newWithString`` and
+    ## ``initWithString``.
+    ## ``tearDown`` is called from ``close``.
+    ## an example is ``test/lexer_global_var.nim``.
+    setUp:
+      doSomething()
+    tearDown:
+      doSomething()
 
 Meta charactors are as following:
 
