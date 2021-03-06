@@ -287,5 +287,11 @@ proc calFirsts*[T](g: Grammar[T],
       Dummy:
         result.incl(s)
         return
-      _:
-        doAssert false
+      Empty:
+        raise newException(
+          NimyError,
+          "Unexpected Empty Rule: Ambiguous rules for parse empty sequent " &
+          "cannot be used in nimy.\n" &
+          "Check your grammer has no ambiguous rules in which what non-terminal " &
+          "represents the empty sequent."
+        )
