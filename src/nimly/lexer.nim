@@ -106,6 +106,9 @@ proc lex*[T](nl: var NimlLexer[T]): T =
     except:
       discard
 
+proc isEmpty*[T](nl: NimlLexer[T]): bool =
+  nl.buf[nl.bufpos] == EndOfFile
+
 proc lexNext*[T](nl: var NimlLexer[T]): T =
   while nl.buf[nl.bufpos] != EndOfFile:
     result = nl.lex

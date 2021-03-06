@@ -110,8 +110,13 @@ proc top[T](parser: Parser[T]): State =
 proc parseImpl*[T, S](parser: var Parser[S],
                       lexer: var NimlLexer[T]): ParseTree[T, S] =
   var tree: seq[ParseTree[T, S]] = @[]
-  var token = lexer.lexNext
-  var symbol = TermS[S](token.kind)
+  var token: T
+  var symbol: Symbol[S]
+  if lexer.isEmpty:
+    symbol = End[S]()
+  else:
+    token  = lexer.lexNext
+    symbol = TermS[S](token.kind)
   while true:
     when defined(nimydebug):
       echo "parser stack:" & $parser.stack
@@ -120,11 +125,14 @@ proc parseImpl*[T, S](parser: var Parser[S],
     try:
       action = parser.table.action[parser.top][symbol]
     except KeyError:
-      var msg: string = "Unexpected token" & $symbol & "is passed."
-      try:
-        msg = msg & "\ntoken: " & $token
-      except:
-        discard
+      var msg: string = "Unexpected token " & $symbol & " is passed."
+      if symbol.kind == SymbolKind.End:
+        msg = "Unexpected lexer stops (EOF). Cannot parse whole the tokens lexer passes."
+      else:
+        try:
+          msg = msg & "\ntoken: " & $token
+        except:
+          discard
       raise newException(NimyActionError, msg)
     except:
       raise
