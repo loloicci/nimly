@@ -1,7 +1,7 @@
 #######
  nimly
 #######
-|github_workflow| |azure_pipelines| |nimble|
+|github_workflow| |nimble|
 
 Lexer Generator and Parser Generator as a Macro Library in Nim.
 
@@ -281,8 +281,6 @@ example: ``nim c -d:nimldebug -d:nimydebug -r tests/test_readme_example.nim``
 
 .. |github_workflow| image:: https://github.com/loloicci/nimly/workflows/test/badge.svg
     :target: https://github.com/loloicci/nimly/actions?query=workflow%3Atest
-.. |azure_pipelines| image:: https://dev.azure.com/oxisccl/nimly/_apis/build/status/loloicci.nimly?branchName=master
-    :target: https://dev.azure.com/oxisccl/nimly/_build/latest?definitionId=1&branchName=master
 .. |nimble| image:: https://raw.githubusercontent.com/yglukhov/nimble-tag/master/nimble.png
     :target: https://github.com/yglukhov/nimble-tag
 .. _changelog.rst: ./changelog.rst
