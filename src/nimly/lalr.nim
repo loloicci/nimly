@@ -62,7 +62,13 @@ proc closure[T](g: Grammar[T], whole: LALRItems[T]): LALRItems[T] =
       match i.next:
         NonTermS:
           for r in g.filterRulesLeftIs(i.next):
+            when defined(nimydebug):
+              if i.ahead.kind == SymbolKind.Empty:
+                echo "(ahead is emp) i: " & $i
             for fst in g.calFirsts(i.fromNextNext & i.ahead):
+              when defined(nimydebug):
+                if fst.kind == SymbolKind.Empty:
+                  echo "(gen emp fst) i: " & $i
               let n = LALRItem[T](rule: r, pos: 0, ahead: fst)
               if not result.containsOrIncl(n):
                 new.incl(n)
@@ -89,6 +95,17 @@ proc incl[T](ot: var OrderedTable[int, T], vl: T) =
 proc foward[T](itm: LALRItem[T]): LALRItem[T] =
   result = LALRItem[T](rule: itm.rule, pos: itm.pos + 1, ahead: itm.ahead)
 
+proc firstItem[T](os: OrderedSet[T]): T =
+  for i in os:
+    return i
+
+proc getItemIfSingle[T](s: HashSet[T]): T =
+  if s.card == 1:
+    for i in s:
+      return i
+  raise newException(NimyError, "Unexpected: " & $s & " needs to be single.")
+
+## Same as Dragonbook Argorithm 4.62 & 4.63
 proc toLALRKernel[T](lrKernel: SetOfLRItems[T], g: Grammar[T],
                      tt: TransTable[T]): SetOfLALRItems[T] =
   # init result
@@ -101,12 +118,9 @@ proc toLALRKernel[T](lrKernel: SetOfLRItems[T], g: Grammar[T],
     checkSet: HashSet[LALRItem[T]] = initLALRItems[T]()
 
   # only starting rule
-  for sk in lrKernel:
-    for si in sk:
-      result[0].incl(si.toLALRItem(End[T]()))
-      checkSet.incl(si.toLALRItem(End[T]()))
-      break
-    break
+  let startingRule = lrKernel.firstItem.getItemIfSingle
+  result[0].incl(startingRule.toLALRItem(End[T]()))
+  checkSet.incl(startingRule.toLALRItem(End[T]()))
 
   # init collection and cal propagate
   for idx, itms in lrKernel:
@@ -116,6 +130,7 @@ proc toLALRKernel[T](lrKernel: SetOfLRItems[T], g: Grammar[T],
       if not (propagation.haskey(itm)):
         propagation[itm] = initHashSet[(int, LRItem[T])]()
 
+      # Dummy is "#" in dragonbook
       let clsr = g.closure(itm.toLALRItem(Dummy[T]()))
       for ci in clsr:
         if ci.ahead == Dummy[T]():
