@@ -293,122 +293,6 @@ proc makeRuleProc(name, body, rTy, tokenType, tokenKind: NimNode,
   else:
     result = newProc(name, params)
 
-proc addVarSymToInt(stm : var NimNode,
-                    id, tokenKind: NimNode, syms: seq[NimNode]) =
-  stm.expectKind(nnkStmtList)
-  stm.add(
-    newVarStmt(
-      id,
-      nnkCall.newTree(
-        nnkBracketExpr.newTree(
-          newIdentNode("initTable"),
-          nnkBracketExpr.newTree(
-            newIdentNode("Symbol"),
-            tokenKind
-          ),
-          newIdentNode("int")
-        )
-      )
-    )
-  )
-  for i, sym in syms:
-    stm.add(
-      nnkAsgn.newTree(
-        nnkBracketExpr.newTree(
-          id,
-          sym
-        ),
-        newIntLitNode(i)
-      )
-    )
-
-proc addRuleToInt(stm : var NimNode,
-                  id, tokenKind: NimNode, rules: seq[NimNode]) =
-  stm.expectKind(nnkStmtList)
-  stm.add(
-    newVarStmt(
-      id,
-      nnkCall.newTree(
-        nnkBracketExpr.newTree(
-          newIdentNode("initTable"),
-          nnkBracketExpr.newTree(
-            newIdentNode("Rule"),
-            tokenKind
-          ),
-          newIdentNode("int")
-        )
-      )
-    )
-  )
-  for i, r in rules:
-    stm.add(
-      nnkAsgn.newTree(
-        nnkBracketExpr.newTree(
-          id,
-          r
-        ),
-        newIntLitNode(- (i + 1))
-      )
-    )
-
-proc addIntToRule(stm : var NimNode,
-                  id, tokenKind: NimNode, rules: seq[NimNode]) =
-  stm.expectKind(nnkStmtList)
-  stm.add(
-    newVarStmt(
-      id,
-      nnkCall.newTree(
-        nnkBracketExpr.newTree(
-          newIdentNode("initTable"),
-          newIdentNode("int"),
-          nnkBracketExpr.newTree(
-            newIdentNode("Rule"),
-            tokenKind
-          )
-        )
-      )
-    )
-  )
-  for i, r in rules:
-    stm.add(
-      nnkAsgn.newTree(
-        nnkBracketExpr.newTree(
-          id,
-        newIntLitNode(- (i + 1))
-        ),
-        r
-      )
-    )
-
-proc addVarIntToSym(stm : var NimNode,
-                    id, tokenKind: NimNode, syms: seq[NimNode]) =
-  stm.expectKind(nnkStmtList)
-  stm.add(
-    newVarStmt(
-      id,
-      nnkCall.newTree(
-        nnkBracketExpr.newTree(
-          newIdentNode("initTable"),
-          newIdentNode("int"),
-          nnkBracketExpr.newTree(
-            newIdentNode("Symbol"),
-            tokenKind
-          )
-        )
-      )
-    )
-  )
-  for i, sym in syms:
-    stm.add(
-      nnkAsgn.newTree(
-        nnkBracketExpr.newTree(
-          id,
-          newIntLitNode(i)
-        ),
-        sym
-      )
-    )
-
 proc tableMakerProc(name, tokenType, tokenKind, topNonTerm,
                     tableMaker: NimNode,
                     rules, ruleDefs, syms: seq[NimNode]): NimNode =
@@ -930,10 +814,6 @@ macro nimy*(head, body: untyped): untyped =
         )
       )
     )
-
-  let
-    its = genSym(nskVar)
-    itr = genSym(nskVar)
 
   result.add(ruleDefs)
 
