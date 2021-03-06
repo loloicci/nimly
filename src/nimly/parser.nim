@@ -125,11 +125,14 @@ proc parseImpl*[T, S](parser: var Parser[S],
     try:
       action = parser.table.action[parser.top][symbol]
     except KeyError:
-      var msg: string = "Unexpected token" & $symbol & "is passed."
-      try:
-        msg = msg & "\ntoken: " & $token
-      except:
-        discard
+      var msg: string = "Unexpected token " & $symbol & " is passed."
+      if symbol.kind == SymbolKind.End:
+        msg = "Unexpected lexer stops (EOF). Cannot parse whole the tokens lexer passes."
+      else:
+        try:
+          msg = msg & "\ntoken: " & $token
+        except:
+          discard
       raise newException(NimyActionError, msg)
     except:
       raise
