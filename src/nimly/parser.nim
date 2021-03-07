@@ -57,13 +57,9 @@ type
   ConstActionTable = seq[seq[int]]
   ConstGotoTable = seq[seq[int]]
   ConstTable* = (ConstActionTable, ConstGotoTable)
-  SymbolToInt[T] = Table[Symbol[T], int]
-  RuleToInt[T] = Table[Rule[T], int]
   Parser*[T] = object
     stack: seq[State]
     table: ParsingTable[T]
-  IntToSym[T] = Table[int, Symbol[T]]
-  IntToRule[T] = Table[int, Rule[T]]
 
 proc `$`*[T](at: ActionTable[T]): string =
   result = "\nActionTable:\n--------\n"
@@ -80,11 +76,6 @@ proc `$`*[T](gt: GotoTable[T]): string =
 variantp ParseTree[T, S]:
   Terminal(token: T)
   NonTerminal(rule: Rule[S], tree: seq[ParseTree[T, S]])
-
-proc inst[T](sq: var seq[T], item: T, default: T, index: int) =
-  for i in 0..(index - sq.len):
-    sq.add(default)
-  sq[index] = item
 
 proc `$`*[T, S](pt: ParseTree[T, S], indent: int = 0): string =
   match pt:
