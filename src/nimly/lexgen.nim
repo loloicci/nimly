@@ -816,7 +816,7 @@ proc convertToSeqRePart(re: string): seq[RePart] =
         of 'd', 'D', 's', 'S', 'w', 'W':
           result.add(Tree(classTable[c].convertToTree))
         else:
-          doassert false, "Invalid escaping"
+          doassert false, "Invalid escaping \"\\" & c & "\" is in niml match pattern."
         flag.excl(readingEscape)
       else:
         case c
