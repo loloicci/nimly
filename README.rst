@@ -17,7 +17,7 @@ niml
 macro niml
 ----------
 macro ``niml`` makes a lexer.
-Almost all part of constructing a lexer is done in comile-time.
+Almost all part of constructing a lexer is done in compile-time.
 Example is as follows.
 
 .. code-block:: nim
